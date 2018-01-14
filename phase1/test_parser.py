@@ -65,5 +65,5 @@ class TestParser(unittest.TestCase):
         #print m
 
     def test_rule(self):
-        m = p.parse("rule", r'func foo():string {/"foo"/}')
+        m = p.parse("rule_decl", r'func foo():string {/"foo"/}')
         #print m

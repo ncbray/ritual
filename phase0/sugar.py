@@ -33,12 +33,13 @@ p.rule(Native('Append', Append))
 p.rule(Native('Any', Any))
 
 p.rule(Rule('S',
-    Repeat(punc(' ', '\t', '\n'), 0, 0)
+    Repeat(punc(' ', '\t', '\n', '\r'), 0, 0)
 ))
 p.rule(Rule('esc_char',
     punc('\\') & (
         punc('n') & Literal('\n')
         | punc('t') & Literal('\t')
+        | punc('r') & Literal('\r')
         | Slice(Any())
     )
 ))

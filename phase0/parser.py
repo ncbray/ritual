@@ -247,8 +247,15 @@ class Rule(Callable):
 
     def call(self, parser, args):
         assert not args, args
+        #loc = 'EOS'
+        #if parser.pos < len(parser.stream):
+        #    loc = parser.stream[parser.pos]
+        #print '%s @ %r' % (self.name, loc)
+
         parser.enterFrame(self.name)
         result = self.body.match(parser)
+        #if parser.ok:
+        #    print self.name, "=>", result
         parser.exitFrame()
         return result
 

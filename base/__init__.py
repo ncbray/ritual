@@ -57,3 +57,33 @@ class TreeMeta(type):
             exec src in cls_globals, dct
 
         return super(TreeMeta, cls).__new__(cls, name, parents, dct)
+
+
+@classmethod
+def visit(cls, *args):
+    f = cls.__dispatchers__.get(type(args[0]))
+    if f:
+        return f(cls, *args)
+    else:
+        raise Exception("%r cannot visit %r" % (cls, type(args[0])))
+
+
+def dispatch(*types):
+    def annotate(f):
+        f.__dispatch__ = types
+        return f
+    return annotate
+
+
+class TypeDispatcher(type):
+    def __new__(cls, name, parents, dct):
+        d = {}
+        for f in dct.itervalues():
+            if not hasattr(f, '__dispatch__'):
+                continue
+            for t in f.__dispatch__:
+                d[t] = f
+        dct['__dispatchers__'] = d
+        dct['visit'] = visit
+
+        return super(TypeDispatcher, cls).__new__(cls, name, parents, dct)
