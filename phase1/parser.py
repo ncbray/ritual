@@ -1,14 +1,14 @@
 from base import TypeDispatcher, dispatch
 
-from phase0 import sugar
-from phase0.parser import *
+from interpreter import *
+import phase0.parser
 
 import model
 
 p = Parser()
 
 def rule(name, body):
-    p.rule(Rule(name, sugar.text_match(body)))
+    p.rule(Rule(name, phase0.parser.text_match(body)))
 
 def halt():
     import pdb;pdb.set_trace()
@@ -19,21 +19,7 @@ p.rule(Native('dec_to_int', lambda text: int(text, 10)))
 p.rule(Native('chars_to_string', lambda chars: ''.join(chars)))
 p.rule(Native('halt', halt))
 
-p.rule(Native('Range', Range))
-p.rule(Native('Character', Character))
-p.rule(Native('MatchValue', MatchValue))
-p.rule(Native('Repeat', Repeat))
-p.rule(Native('Sequence', Sequence))
-p.rule(Native('Choice', Choice))
-p.rule(Native('Literal', Literal))
-p.rule(Native('Slice', Slice))
-p.rule(Native('List', List))
-p.rule(Native('Call', Call))
-p.rule(Native('Get', Get))
-p.rule(Native('Set', Set))
-p.rule(Native('Append', Append))
-p.rule(Native('Any', Any))
-
+registerInterpreterTypes(p)
 model.registerTypes(p)
 
 rule('S', r'([[ \t\n\r]]|$"//";[[^\n]]*)*')

@@ -1,5 +1,5 @@
 import base
-import phase0.parser
+import interpreter
 
 
 class Decl(object):
@@ -42,7 +42,7 @@ class Extern(Decl):
 
 class RuleDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string rt:TypeRef body:phase0.parser.Matcher'
+    __schema__ = 'name:string rt:TypeRef body:interpreter.Matcher'
 
 
 class File(object):
@@ -50,11 +50,11 @@ class File(object):
     __schema__ = 'decls:[]Decl'
 
 def registerTypes(p):
-    p.rule(phase0.parser.Native('NameRef', NameRef))
-    p.rule(phase0.parser.Native('ListRef', ListRef))
-    p.rule(phase0.parser.Native('FieldDecl', FieldDecl))
-    p.rule(phase0.parser.Native('StructDecl', StructDecl))
-    p.rule(phase0.parser.Native('UnionDecl', UnionDecl))
-    p.rule(phase0.parser.Native('Extern', Extern))
-    p.rule(phase0.parser.Native('RuleDecl', RuleDecl))
-    p.rule(phase0.parser.Native('File', File))
+    p.rule(interpreter.Native('NameRef', NameRef))
+    p.rule(interpreter.Native('ListRef', ListRef))
+    p.rule(interpreter.Native('FieldDecl', FieldDecl))
+    p.rule(interpreter.Native('StructDecl', StructDecl))
+    p.rule(interpreter.Native('UnionDecl', UnionDecl))
+    p.rule(interpreter.Native('Extern', Extern))
+    p.rule(interpreter.Native('RuleDecl', RuleDecl))
+    p.rule(interpreter.Native('File', File))

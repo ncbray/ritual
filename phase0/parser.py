@@ -1,339 +1,140 @@
-import base
-
-class Matcher(object):
-    def match(self, parser):
-        raise NotImplementedError()
-
-    def __and__(self, other):
-        return Sequence([self, other])
-
-    def __or__(self, other):
-        return Choice([self, other])
-
-    def __call__(self, *args):
-        return Call(self, list(args))
-
-
-class Sequence(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'children:[]Matcher'
-
-    def match(self, parser):
-        result = None
-        for m in self.children:
-            result = m.match(parser)
-            if not parser.ok:
-                return result
-        return result
-
-    def __and__(self, other):
-        if isinstance(other, Sequence):
-            others = other.children
-        else:
-            others = [other]
-        return Sequence(self.children + others)
-
-
-class Choice(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'children:[]Matcher'
-
-    def match(self, parser):
-        result = None
-        pos = parser.pos
-        for m in self.children:
-            result = m.match(parser)
-            if parser.ok:
-                return result
-            parser.recover(pos)
-        parser.fail()
-        return result
-
-    def __or__(self, other):
-        if isinstance(other, Choice):
-            others = other.children
-        else:
-            others = [other]
-        return Choice(self.children + others)
-
-
-class Repeat(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher min:int max:int'
-
-    def match(self, parser):
-        count = 0
-        while count < self.min:
-            self.expr.match(parser)
-            if not parser.ok:
-                return
-            count += 1
-
-        while count < self.max or self.max <= 0:
-            pos = parser.pos
-            self.expr.match(parser)
-            if not parser.ok:
-                parser.recover(pos)
-                return
-            count += 1
-        # TODO collect list?
-
-
-class Call(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher args:[]Matcher'
-
-    def match(self, parser):
-        expr = self.expr.match(parser)
-        if not parser.ok:
-            return expr
-        values = []
-        for arg in self.args:
-            value = arg.match(parser)
-            if not parser.ok:
-                return value
-            values.append(value)
-        if not isinstance(expr, Callable):
-            parser.internalError(self, "Cannot call %r" % expr)
-        return expr.call(parser, values)
-
-
-class Any(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = ''
-
-    def match(self, parser):
-        if parser.hasNext():
-            parser.consume()
-        else:
-            parser.fail()
-
-
-class Range(object):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'lower:rune upper:rune'
-
-
-class Character(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'ranges:[]Range invert:bool'
-
-    def match(self, parser):
-        if not parser.hasNext():
-            parser.fail()
-            return
-        c = parser.peek()
-
-        matches = False
-        for r in self.ranges:
-            if r.lower <= c <= r.upper:
-                matches = True
-                break
-
-        if matches != self.invert:
-            parser.consume()
-        else:
-            parser.fail()
-        return c
-
-
-class MatchValue(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher'
-
-    def match(self, parser):
-        expr = self.expr.match(parser)
-        if not parser.ok:
-            return expr
-
-        for c in expr:
-            if not parser.hasNext() or parser.peek() != c:
-                parser.fail()
-                return
-            parser.consume()
-        return expr
-
-
-class Slice(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher'
-
-    def match(self, parser):
-        pos = parser.pos
-        result = self.expr.match(parser)
-        if parser.ok:
-            result = unicode(parser.stream[pos:parser.pos])
-        return result
-
-
-class Get(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string'
-
-    def match(self, parser):
-        n = self.name
-        lcls = parser.stack[-1].scope
-        if n in lcls:
-            return lcls[n]
-        elif n in parser.rules:
-            return parser.rules[n]
-        else:
-            parser.internalError(self, "Unbound name %r" % n)
-
-
-class Set(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher name:string'
-
-    def match(self, parser):
-        result = self.expr.match(parser)
-        if parser.ok:
-            if isinstance(result, Callable):
-                parser.internalError(self, "Should not be storing a Callable to %r" % self.name)
-            lcls = parser.stack[-1].scope
-            lcls[self.name] = result
-        return result
-
-
-class Append(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher name:string'
-
-    def match(self, parser):
-        result = self.expr.match(parser)
-        if parser.ok:
-            n = self.name
-            if isinstance(result, Callable):
-                parser.internalError(self, "Should not be storing a Callable to %r" % n)
-            lcls = parser.stack[-1].scope
-            if n not in lcls:
-                parser.internalError(self, "Unbound name %r" % n)
-            tgt = lcls[n]
-            if not isinstance(tgt, list):
-                parser.internalError(self, "Append target %r is a %r and not a list" % (n, type(tgt)))
-            tgt.append(result)
-        return result
-
-
-class List(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'args:[]Matcher'
-
-    def match(self, parser):
-        values = []
-        for arg in self.args:
-            value = arg.match(parser)
-            if not parser.ok:
-                return value
-            values.append(value)
-        return values
-
-
-class Literal(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'value:*'
-
-    def match(self, parser):
-        return self.value
-
-
-class Callable(object):
-    __slots__ = []
-
-
-class Rule(Callable):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string body:Matcher'
-
-    def call(self, parser, args):
-        assert not args, args
-        #loc = 'EOS'
-        #if parser.pos < len(parser.stream):
-        #    loc = parser.stream[parser.pos]
-        #print '%s @ %r' % (self.name, loc)
-
-        parser.enterFrame(self.name)
-        result = self.body.match(parser)
-        #if parser.ok:
-        #    print self.name, "=>", result
-        parser.exitFrame()
-        return result
-
-
-class Native(Callable):
-    __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string func:*'
-
-    def call(self, parser, args):
-        try:
-            return self.func(*args)
-        except:
-            parser.printStack()
-            raise
-
-class ParseFailed(Exception):
-    pass
-
-class StackFrame(object):
-    def __init__(self, name):
-        self.name = name
-        self.scope = {}
-
-class Parser(object):
-    def __init__(self):
-        self.rules = {}
-
-    def rule(self, rule):
-        assert rule.name not in self.rules
-        self.rules[rule.name] = rule
-
-    def hasNext(self):
-        return self.pos < len(self.stream)
-
-    def peek(self):
-        return self.stream[self.pos]
-
-    def consume(self):
-        self.pos += 1
-
-    def fail(self):
-        self.deepest = max(self.deepest, self.pos)
-        self.ok = False
-        #print
-        #self.printStack()
-
-    def recover(self, pos):
-        self.pos = pos
-        self.ok = True
-
-    def enterFrame(self, name):
-        self.stack.append(StackFrame(name))
-
-    def exitFrame(self):
-        self.stack.pop()
-
-    def printStack(self):
-        for frame in reversed(self.stack):
-            print '    %-25s %r' % (frame.name, frame.scope)
-
-    def internalError(self, node, msg):
-        print msg
-        print node
-        self.printStack()
-        raise Exception(msg)
-
-    def parse(self, name, text):
-        self.stream = text
-        self.pos = 0
-        self.deepest = 0
-        self.ok = True
-        self.stack = []
-        result = self.rules[name].call(self, [])
-        if self.hasNext():
-            self.fail()
-        if not self.ok:
-            a = max(self.deepest - 1, 0)
-            b = min(self.deepest + 2, len(self.stream))
-            clip = self.stream[a:b]
-            raise ParseFailed("Error at %d: %r" % (self.deepest, clip))
-        return result
+from interpreter import *
+
+def punc(*chars):
+    return Character([Range(c, c) for c in chars], False)
+
+def not_punc(*chars):
+    return Character([Range(c, c) for c in chars], True)
+
+def tok(text):
+    return MatchValue(Literal(text))
+
+def optional(e):
+    return Choice([e, Sequence([])])
+
+p = Parser()
+
+p.rule(Native('chars_to_string', lambda chars: ''.join(chars)))
+p.rule(Native('string_to_int', lambda text: int(text, 0)))
+
+registerInterpreterTypes(p)
+
+p.rule(Rule('S',
+    Repeat(punc(' ', '\t', '\n', '\r'), 0, 0)
+))
+p.rule(Rule('esc_char',
+    punc('\\') & (
+        punc('n') & Literal('\n')
+        | punc('t') & Literal('\t')
+        | punc('r') & Literal('\r')
+        | Slice(Any())
+    )
+))
+p.rule(Rule('c',
+    Get('esc_char')() | Slice(Character([Range(']', ']'), Range('-', '-'), Range('^', '^')], True))
+))
+p.rule(Rule('r',
+    Set(Get('c')(), 'a') & (punc('-') & Get('Range')(Get('a'), Get('c')()) | Get('Range')(Get('a'), Get('a')))
+))
+p.rule(Rule('char',
+    tok('[[') & Set(Literal(False), 'inv') & Set(List([]), 'ranges') & optional(punc('^') & Set(Literal(True), 'inv')) & Repeat(Append(Get('r')(), 'ranges'), 0, 0) & tok(']]') & Get('Character')(Get('ranges'), Get('inv'))
+))
+p.rule(Rule('string_literal',
+    punc('"') & Set(List([]), 'chars') & Repeat(Append(Get('esc_char')() | Slice(not_punc('"')), 'chars'), 0, 0) & punc('"') & Get('Literal')(Get('chars_to_string')(Get('chars')))
+))
+p.rule(Rule('boolean_literal',
+    tok('true') & Get('Literal')(Literal(True)) | tok('false') & Get('Literal')(Literal(False))
+))
+p.rule(Rule('int_literal',
+    Get('Literal')(
+        Get('string_to_int')(
+            Slice(
+                MatchValue(Literal("0x"))
+                & Repeat(Character([Range('0', '9'), Range('a', 'f'), Range('A', 'F')], False), 1, 0)
+                | Repeat(Character([Range('0', '9')], False), 1, 0)
+            )
+        )
+    )
+))
+p.rule(Rule('list_literal',
+    punc('[') & Set(List([]), 'es') &
+        (Get('S')() & Append(Get('expr')(), 'es') & Repeat(Get('S')() & punc(',') & Get('S')() & Append(Get('expr')(), 'es'), 0, 0)
+        | Sequence([])
+    ) & Get('S')() & punc(']') & Get('List')(Get('es'))
+))
+p.rule(Rule('ident',
+    Slice(Repeat(Character([Range('a', 'z'), Range('A', 'Z'), Range('_', '_')], False), 1, 0))
+))
+p.rule(Rule('atom',
+    punc('(') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc(')') & Get('e')
+    | punc('<') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc('>') & Get('Slice')(Get('e'))
+    | punc('$') & Get('S')() & Get('MatchValue')(Get('atom')())
+    | Get('char')()
+    | punc('.') & Get('Any')()
+    | Get('list_literal')()
+    | Get('string_literal')()
+    | Get('boolean_literal')()
+    | Get('int_literal')()
+    | Get('Get')(Get('ident')())
+))
+p.rule(Rule('call',
+    Set(Get('atom')(), 'e')
+    & Repeat(Set(
+        punc('(')
+        & Set(List([]), 'args')
+        & (
+            Get('S')() & Append(Get('expr')(), 'args')
+            & Repeat(Get('S')() & punc(',') & Get('S')() & Append(Get('expr')(), 'args'), 0, 0)
+            | Sequence([])
+        )
+        & Get('S')() & punc(')')
+        & Get('Call')(Get('e'), Get('args')),
+    'e'), 0, 0)
+    & Get('e')
+))
+p.rule(Rule('repeat',
+    Set(Get('call')(), 'e')
+    & ( Get('S')() &
+        ( punc('*') & Get('Repeat')(Get('e'), Literal(0), Literal(0))
+        | punc('+') & Get('Repeat')(Get('e'), Literal(1), Literal(0))
+        | punc('?') & Get('Repeat')(Get('e'), Literal(0), Literal(1)) # TODO implement as choice?
+        # TODO {m,n}
+        )
+    | Get('e')
+    )
+))
+p.rule(Rule('assign',
+    (Set(Get('ident')(), 'name') & Get('S')() &
+        ( punc('=') & Get('S')() & Get('Set')(Get('repeat')(), Get('name'))
+        | tok('<<') & Get('S')() & Get('Append')(Get('repeat')(), Get('name'))
+        )
+    | Get('repeat')()
+    )
+))
+
+p.rule(Rule('sequence',
+    Set(Get('assign')(), 'e')
+    & (
+        Set(List([Get('e')]), 'es')
+        & Repeat(Append(Get('S')() & punc(';') & Get('S')() & Get('assign')(), 'es'), 1, 0)
+        & Get('Sequence')(Get('es'))
+    | Get('e')
+    )
+))
+p.rule(Rule('choice',
+    Set(Get('sequence')(), 'e')
+    & (
+        Set(List([Get('e')]), 'es')
+        & Repeat(Append(Get('S')() & punc('|') & Get('S')() &Get('sequence')(), 'es'), 1, 0)
+        & Get('Choice')(Get('es'))
+    | Get('e')
+    )
+))
+
+p.rule(Rule('expr',
+    Get('choice')()
+))
+
+
+def text_match(text):
+    return p.parse('expr', text)
