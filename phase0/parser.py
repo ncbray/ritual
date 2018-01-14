@@ -1,3 +1,5 @@
+import base
+
 class Matcher(object):
     def match(self, parser):
         raise NotImplementedError()
@@ -9,14 +11,12 @@ class Matcher(object):
         return Choice([self, other])
 
     def __call__(self, *args):
-        return Call(self, args)
+        return Call(self, list(args))
 
 
 class Sequence(Matcher):
-    def __init__(self, children):
-        for child in children:
-            assert isinstance(child, Matcher), child
-        self.children = children
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'children:[]Matcher'
 
     def match(self, parser):
         result = None
@@ -33,18 +33,10 @@ class Sequence(Matcher):
             others = [other]
         return Sequence(self.children + others)
 
-    def source(self):
-        return '&'.join([o.source() for o in self.children])
-
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.children)
-
 
 class Choice(Matcher):
-    def __init__(self, children):
-        for child in children:
-            assert isinstance(child, Matcher), child
-        self.children = children
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'children:[]Matcher'
 
     def match(self, parser):
         result = None
@@ -64,19 +56,10 @@ class Choice(Matcher):
             others = [other]
         return Choice(self.children + others)
 
-    def source(self):
-        return '|'.join([o.source() for o in self.children])
-
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.children)
-
 
 class Repeat(Matcher):
-    def __init__(self, expr, min, max):
-        assert isinstance(expr, Matcher), expr
-        self.expr = expr
-        self.min = min
-        self.max = max
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher min:int max:int'
 
     def match(self, parser):
         count = 0
@@ -95,17 +78,10 @@ class Repeat(Matcher):
             count += 1
         # TODO collect list?
 
-    def __repr__(self):
-        return '%s(%r, %r, %r)' % (type(self).__name__, self.expr, self.min, self.max)
-
 
 class Call(Matcher):
-    def __init__(self, expr, args):
-        assert isinstance(expr, Matcher), expr
-        for arg in args:
-            assert isinstance(arg, Matcher), arg
-        self.expr = expr
-        self.args = tuple(args)
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher args:[]Matcher'
 
     def match(self, parser):
         expr = self.expr.match(parser)
@@ -121,52 +97,26 @@ class Call(Matcher):
             parser.internalError(self, "Cannot call %r" % expr)
         return expr.call(parser, values)
 
-    def source(self):
-        return self.name + '()'
-
-    def __repr__(self):
-        return '%s(%r, %r)' % (type(self).__name__, self.expr, self.args)
-
 
 class Any(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = ''
+
     def match(self, parser):
         if parser.hasNext():
             parser.consume()
         else:
             parser.fail()
 
-    def source(self):
-        return '.'
-
 
 class Range(object):
-    __slots__ = ['lower', 'upper']
-
-    def __init__(self, lower, upper):
-        assert len(lower) == 1
-        assert len(upper) == 1
-        assert lower <= upper
-        self.lower = lower
-        self.upper = upper
-
-    def source(self):
-        # TODO escape
-        if self.lower == self.upper:
-            return self.lower
-        else:
-            return '%s-%s' % (self.lower, self.upper)
-
-    def __repr__(self):
-        return '%s(%r, %r)' % (type(self).__name__, self.lower, self.upper)
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'lower:rune upper:rune'
 
 
 class Character(Matcher):
-    def __init__(self, ranges, invert):
-        for r in ranges:
-            assert isinstance(r, Range), r
-        assert isinstance(invert, bool), invert
-        self.ranges = tuple(ranges)
-        self.invert = invert
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'ranges:[]Range invert:bool'
 
     def match(self, parser):
         if not parser.hasNext():
@@ -186,16 +136,10 @@ class Character(Matcher):
             parser.fail()
         return c
 
-    def source(self):
-        return ('[^%s]' if self.invert else '[%s]') % ''.join([r.source() for r in self.ranges])
-
-    def __repr__(self):
-        return '%s(%r, %r)' % (type(self).__name__, self.ranges, self.invert)
-
 
 class MatchValue(Matcher):
-    def __init__(self, expr):
-        self.expr = expr
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher'
 
     def match(self, parser):
         expr = self.expr.match(parser)
@@ -209,16 +153,10 @@ class MatchValue(Matcher):
             parser.consume()
         return expr
 
-    def source(self):
-        return repr(self.text)
-
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.expr)
-
 
 class Slice(Matcher):
-    def __init__(self, expr):
-        self.expr = expr
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher'
 
     def match(self, parser):
         pos = parser.pos
@@ -227,13 +165,10 @@ class Slice(Matcher):
             result = unicode(parser.stream[pos:parser.pos])
         return result
 
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.expr)
-
 
 class Get(Matcher):
-    def __init__(self, name):
-        self.name = name
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string'
 
     def match(self, parser):
         n = self.name
@@ -245,45 +180,44 @@ class Get(Matcher):
         else:
             parser.internalError(self, "Unbound name %r" % n)
 
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.name)
-
 
 class Set(Matcher):
-    def __init__(self, expr, name):
-        self.expr = expr
-        self.name = name
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher name:string'
 
     def match(self, parser):
         result = self.expr.match(parser)
         if parser.ok:
+            if isinstance(result, Callable):
+                parser.internalError(self, "Should not be storing a Callable to %r" % self.name)
             lcls = parser.stack[-1].scope
             lcls[self.name] = result
         return result
 
-    def __repr__(self):
-        return '%s(%r, %r)' % (type(self).__name__, self.expr, self.name)
-
 
 class Append(Matcher):
-    def __init__(self, expr, name):
-        self.expr = expr
-        self.name = name
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher name:string'
 
     def match(self, parser):
         result = self.expr.match(parser)
         if parser.ok:
+            n = self.name
+            if isinstance(result, Callable):
+                parser.internalError(self, "Should not be storing a Callable to %r" % n)
             lcls = parser.stack[-1].scope
-            lcls[self.name].append(result)
+            if n not in lcls:
+                parser.internalError(self, "Unbound name %r" % n)
+            tgt = lcls[n]
+            if not isinstance(tgt, list):
+                parser.internalError(self, "Append target %r is a %r and not a list" % (n, type(tgt)))
+            tgt.append(result)
         return result
-
-    def __repr__(self):
-        return '%s(%r, %r)' % (type(self).__name__, self.expr, self.name)
 
 
 class List(Matcher):
-    def __init__(self, args):
-        self.args = tuple(args)
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'args:[]Matcher'
 
     def match(self, parser):
         values = []
@@ -296,24 +230,20 @@ class List(Matcher):
 
 
 class Literal(Matcher):
-    def __init__(self, value):
-        self.value = value
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'value:*'
 
     def match(self, parser):
         return self.value
 
-    def __repr__(self):
-        return '%s(%r)' % (type(self).__name__, self.value)
-
 
 class Callable(object):
-    pass
+    __slots__ = []
 
 
 class Rule(Callable):
-    def __init__(self, name, body):
-        self.name = name
-        self.body = body
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string body:Matcher'
 
     def call(self, parser, args):
         assert not args, args
@@ -324,9 +254,8 @@ class Rule(Callable):
 
 
 class Native(Callable):
-    def __init__(self, name, func):
-        self.name = name
-        self.func = func
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string func:*'
 
     def call(self, parser, args):
         try:

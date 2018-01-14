@@ -1,10 +1,10 @@
 from parser import *
 
 def punc(*chars):
-    return Character(tuple([Range(c, c) for c in chars]), False)
+    return Character([Range(c, c) for c in chars], False)
 
 def not_punc(*chars):
-    return Character(tuple([Range(c, c) for c in chars]), True)
+    return Character([Range(c, c) for c in chars], True)
 
 def tok(text):
     return MatchValue(Literal(text))
@@ -43,7 +43,7 @@ p.rule(Rule('esc_char',
     )
 ))
 p.rule(Rule('c',
-    Get('esc_char')() | Slice(Character((Range(']', ']'), Range('-', '-'), Range('^', '^')), True))
+    Get('esc_char')() | Slice(Character([Range(']', ']'), Range('-', '-'), Range('^', '^')], True))
 ))
 p.rule(Rule('r',
     Set(Get('c')(), 'a') & (punc('-') & Get('Range')(Get('a'), Get('c')()) | Get('Range')(Get('a'), Get('a')))

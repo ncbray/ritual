@@ -1,6 +1,8 @@
 from phase0 import sugar
 from phase0.parser import *
 
+import model
+
 p = Parser()
 
 def rule(name, body):
@@ -25,6 +27,8 @@ p.rule(Native('Get', Get))
 p.rule(Native('Set', Set))
 p.rule(Native('Append', Append))
 p.rule(Native('Any', Any))
+
+model.registerTypes(p)
 
 rule('S', r'([[ \t\n\r]]|$"//";[[^\n]]*)*')
 rule('hex_digit', r'[[0-9a-fA-F]]')
@@ -52,7 +56,7 @@ rule('match_expr_atom', r"""(
     char_match()
     | $"("; e=match_expr(); $")"; e
     | $"<"; e=match_expr(); $">"; Slice(e)
-    | MatchValue(string_value())
+    | MatchValue(Literal(string_value()))
     | Call(Get(ident()),[])
     )""")
 rule('match_expr_repeat', r"""e=match_expr_atom();
@@ -102,6 +106,8 @@ rule('expr_repeat', r"""e=expr_call();
     ))*; e""")
 rule('expr_assign', r"""name=ident(); S(); ($"="; S(); Set(expr_repeat(), name)|$"<<"; S(); Append(expr_repeat(), name))
 | expr_repeat()""")
-rule('expr_sequence', r"""e=expr_assign(); (es=[e]; (S(); $";"; S();es<<expr_assign())+; e=Sequence(es))?; e""")
+rule('expr_sequence', r"""e=expr_assign(); (es=[e]; (S(); $";"; S(); es<<expr_assign())+; e=Sequence(es))?; e""")
 rule('expr_choice', r"""e=expr_sequence(); (es=[e]; (S(); $"|"; S(); es<<expr_sequence())+; e=Choice(es))?; e""")
 rule('expr', r"""expr_choice()""")
+rule('type_ref', r"""ident()""")
+rule('rule', r"""$"func"; S(); name=ident(); S(); $"("; S(); $")"; S(); $":"; S(); rt=type_ref(); S(); $"{"; S(); body=expr(); S(); $"}"; RuleDecl(name, rt, body)""")

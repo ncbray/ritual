@@ -63,3 +63,7 @@ class TestParser(unittest.TestCase):
     def test_expr(self):
         m = p.parse("expr", r'a(); b(x) | c(x, x); d(x , x , x)')
         #print m
+
+    def test_rule(self):
+        m = p.parse("rule", r'func foo():string {/"foo"/}')
+        #print m
