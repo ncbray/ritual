@@ -118,9 +118,8 @@ rule('expr_choice', r"""e=expr_sequence(); (es=[e]; (S(); $"|"; S(); es<<expr_se
 rule('expr', r"""expr_choice()""")
 rule('type_ref', r"""$"[]";ref=type_ref();ListRef(ref)|NameRef(ident())""")
 rule('rule_decl', r"""$"func"; S(); name=ident(); S(); $"("; S(); $")"; S(); $":"; S(); rt=type_ref(); S(); $"{"; S(); body=expr(); S(); $"}"; RuleDecl(name, rt, body)""")
-rule('colon', r'$":"')
-rule('field_decl', r"""name=ident(); S(); $":"; S(); FieldDecl(name, type_ref())""")
 
+rule('field_decl', r"""name=ident(); S(); $":"; S(); FieldDecl(name, type_ref())""")
 rule('struct_decl', r"""$"struct";
 S(); name=ident();
 S(); $"{";
@@ -144,7 +143,7 @@ rule('extern_decl', r"""$"extern";
         S(); params<<type_ref();
         (S(); $","; S(); params<<type_ref())*
     )?;
-    S(); $")"; S(); colon(); S();
+    S(); $")"; S(); $":"; S();
     rt=type_ref(); Extern(name, params, rt)""")
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); File(decls)""")
 

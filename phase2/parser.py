@@ -52,9 +52,23 @@ struct Sequence {
 struct Choice {
     children:[]Matcher
 }
+struct NameRef {
+    name:string
+}
+struct ListRef {
+    ref:TypeRef
+}
+
+struct RuleDecl {
+    name:string
+    rt:TypeRef
+    body:Matcher
+}
 
 union Intrinsic = string | int | bool;
+union TypeRef = NameRef | ListRef;
 union Matcher = Character | Slice | Call | MatchValue | Literal | List | Get | Set | Append | Repeat | Sequence | Choice;
+union Decl = RuleDecl;
 
 func S():void {
     /([ \t\n\r]|"//"[^\n]*)*/
@@ -158,6 +172,92 @@ func match_expr_choice():Matcher {
 }
 func match_expr():Matcher {
     match_expr_choice()
+}
+func expr_atom():Matcher {
+    ( /"(" S e=expr S ")"/; e
+    | /"<" S e=expr S ">"/; Slice(e)
+    | /"/" S e=match_expr S "/"/; e
+    | /"["/; args = []; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "]"/; List(args)
+    | Literal(string_value())
+    | Literal(int_value())
+    | Literal(bool_value())
+    | Get(ident())
+    )
+}
+func expr_call():Matcher {
+    e = expr_atom();
+    (
+        /S "("/;
+        args=[];
+        (
+            S(); args<<expr();
+            (
+                /S "," S/;
+                args<<expr()
+            )*
+        )?;
+        /S ")"/;
+        e=Call(e, args)
+    )*;
+    e
+}
+func expr_repeat():Matcher {
+    e=expr_call();
+    (
+        e=(
+            S();
+            ( /"*"/; Repeat(e, 0, 0)
+            | /"+"/; Repeat(e, 1, 0)
+            | /"?"/; Repeat(e, 0, 1)
+            )
+        )
+    )*;
+    e
+}
+func expr_assign():Matcher {
+    name=ident();
+    S();
+    (/"=" S/; Set(expr_repeat(), name)
+    |/"<<" S/; Append(expr_repeat(), name)
+    )
+    | expr_repeat()
+}
+func expr_sequence():Matcher {
+    e=expr_assign();
+    (
+        es=[e];
+        (
+            /S ";" S/;
+            es<<expr_assign()
+        )+;
+        e=Sequence(es)
+    )?;
+    e
+}
+func expr_choice():Matcher {
+    e=expr_sequence();
+    (
+        es=[e];
+        (
+            /S "|" S/;
+            es<<expr_sequence()
+        )+;
+        e=Choice(es)
+    )?;
+    e
+}
+func expr():Matcher {
+    expr_choice()
+}
+func type_ref():TypeRef {
+    /"[]"/;
+    ref=type_ref();
+    ListRef(ref)
+    | NameRef(ident())
+}
+func rule_decl():Decl {
+    /"func" S name=ident S "(" S ")" S ":" S rt=type_ref S "{" S body=expr S "}"/;
+    RuleDecl(name, rt, body)
 }
 """
 
