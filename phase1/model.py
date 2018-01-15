@@ -35,19 +35,25 @@ class UnionDecl(Decl):
     __schema__ = 'name:string refs:[]TypeRef'
 
 
-class Extern(Decl):
+class ExternDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string params:[]TypeRef rt:TypeRef'
 
 
 class RuleDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string rt:TypeRef body:interpreter.Matcher'
+    __schema__ = 'name:string rt:TypeRef body:interpreter.Matcher, attrs:[]Attribute'
 
 
 class File(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'decls:[]Decl'
+
+
+class Attribute(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string'
+
 
 def registerTypes(p):
     p.rule(interpreter.Native('NameRef', NameRef))
@@ -55,6 +61,7 @@ def registerTypes(p):
     p.rule(interpreter.Native('FieldDecl', FieldDecl))
     p.rule(interpreter.Native('StructDecl', StructDecl))
     p.rule(interpreter.Native('UnionDecl', UnionDecl))
-    p.rule(interpreter.Native('Extern', Extern))
+    p.rule(interpreter.Native('ExternDecl', ExternDecl))
     p.rule(interpreter.Native('RuleDecl', RuleDecl))
     p.rule(interpreter.Native('File', File))
+    p.rule(interpreter.Native('Attribute', Attribute))

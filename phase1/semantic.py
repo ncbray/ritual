@@ -12,12 +12,14 @@ class SemanticPass(object):
     def __init__(self):
         self.scope_name = 'global'
         self.globals = {}
+        self.global_refs = set()
         self.locals = {}
 
     def resolveSlot(self, name):
         if name in self.locals:
             return self.locals[name]
         if name in self.globals:
+            self.global_refs.add(name)
             return self.globals[name]
 
 
@@ -29,11 +31,16 @@ class IndexGlobals(object):
         for decl in node.decls:
             cls.visit(decl, semantic)
 
-    @dispatch(model.RuleDecl, model.Extern, model.StructDecl, model.UnionDecl)
-    def visitRuleDecl(cls, node, semantic):
+    @dispatch(model.RuleDecl, model.ExternDecl, model.StructDecl, model.UnionDecl)
+    def visitNamedDecl(cls, node, semantic):
         if node.name in semantic.globals:
             raise Exception('Attempted to redefine "%s"' % node.name)
         semantic.globals[node.name] = node
+        if hasattr(node, 'attrs'):
+            for attr in node.attrs:
+                if attr.name == 'export':
+                    # Mark exported decls as used.
+                    semantic.global_refs.add(node.name)
 
 
 class ResolveType(object):
@@ -44,6 +51,7 @@ class ResolveType(object):
         if node.name in set(['string', 'int', 'rune', 'void', 'bool']):
             return node.name
         elif node.name in semantic.globals:
+            semantic.global_refs.add(node.name)
             t = semantic.globals[node.name]
             assert isinstance(t, (model.StructDecl, model.UnionDecl)), t
         else:
@@ -73,8 +81,8 @@ class CheckSignatures(object):
             ResolveType.visit(t, semantic)
 
 
-    @dispatch(model.Extern)
-    def visitExtern(cls, node, semantic):
+    @dispatch(model.ExternDecl)
+    def visitExternDecl(cls, node, semantic):
         for p in node.params:
             ResolveType.visit(p, semantic)
         ResolveType.visit(node.rt, semantic)
@@ -92,7 +100,7 @@ class CheckRules(object):
         for decl in node.decls:
             cls.visit(decl, semantic)
 
-    @dispatch(model.StructDecl, model.Extern, model.UnionDecl)
+    @dispatch(model.StructDecl, model.ExternDecl, model.UnionDecl)
     def visitNop(cls, node, semantic):
         pass
 
@@ -139,7 +147,7 @@ class CheckRules(object):
     @dispatch(interpreter.Call)
     def visitCall(cls, node, semantic):
         expr = cls.visit(node.expr, semantic)
-        #if not isinstance(expr, (model.RuleDecl, model.Extern, model.StructDecl)):
+        #if not isinstance(expr, (model.RuleDecl, model.ExternDecl, model.StructDecl)):
         #    raise Exception('Cannot call %r in %s' % (type(expr), semantic.scope_name))
         for arg in node.args:
             cls.visit(arg, semantic)
@@ -176,8 +184,23 @@ class CheckRules(object):
         return '?'
 
 
+class CheckUsed(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(model.File)
+    def visitFile(cls, node, semantic):
+        for decl in node.decls:
+            cls.visit(decl, semantic)
+
+    @dispatch(model.StructDecl, model.UnionDecl, model.ExternDecl, model.RuleDecl)
+    def visitDecl(cls, node, semantic):
+        if node.name not in semantic.global_refs:
+            raise Exception("Unused global: %s" % node.name)
+
+
 def process(f):
     semantic = SemanticPass()
     IndexGlobals.visit(f, semantic)
     CheckSignatures.visit(f, semantic)
     CheckRules.visit(f, semantic)
+    CheckUsed.visit(f, semantic)

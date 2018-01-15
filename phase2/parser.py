@@ -58,13 +58,35 @@ struct NameRef {
 struct ListRef {
     ref:TypeRef
 }
-
 struct RuleDecl {
     name:string
     rt:TypeRef
     body:Matcher
+    attrs:[]Attribute
 }
-
+struct ExternDecl {
+    name:string
+    params:[]TypeRef
+    rt:TypeRef
+}
+struct FieldDecl {
+    name:string
+    t:TypeRef
+}
+struct StructDecl {
+    name:string
+    fields:[]FieldDecl
+}
+struct UnionDecl {
+    name:string
+    refs:[]TypeRef
+}
+struct File {
+    decls:[]Decl
+}
+struct Attribute {
+    name:string
+}
 union Intrinsic = string | int | bool;
 union TypeRef = NameRef | ListRef;
 union Matcher = Character | Slice | Call | MatchValue | Literal | List | Get | Set | Append | Repeat | Sequence | Choice;
@@ -121,6 +143,7 @@ func char_match():Character {
     /[[]/;
     invert=(/[\^]/;true|false);
     ranges = [];
+    (ranges<<char_range())*;
     /[\]]/;
     Character(ranges, invert)
 }
@@ -255,9 +278,64 @@ func type_ref():TypeRef {
     ListRef(ref)
     | NameRef(ident())
 }
-func rule_decl():Decl {
+func attribute():Attribute {
+    Attribute(ident())
+}
+func attributes():[]Attribute {
+    /"["/;
+    attrs=[];
+    (
+        attrs<<attribute();
+        (/S "," S/; attrs<<attribute())*
+    )?;
+    /"]"/;
+    attrs
+}
+func optional_attributes():[]Attribute {
+    attributes()|[]
+}
+func rule_decl():RuleDecl {
+    attrs=optional_attributes(); S();
     /"func" S name=ident S "(" S ")" S ":" S rt=type_ref S "{" S body=expr S "}"/;
-    RuleDecl(name, rt, body)
+    RuleDecl(name, rt, body, attrs)
+}
+func field_decl():FieldDecl {
+    name=ident(); /S ":" S/; FieldDecl(name, type_ref())
+}
+func struct_decl():StructDecl {
+    /"struct" S name=ident S "{"/;
+    fields=[];
+    (S(); fields<<field_decl())*;
+    /S "}"/;
+    StructDecl(name, fields)
+}
+func union_decl():UnionDecl {
+    /"union" S name=ident S "=" S/;
+    refs=[type_ref()];
+    (/S "|" S/; refs<<type_ref())*;
+    /S ";"/;
+    UnionDecl(name, refs)
+}
+func extern_decl():ExternDecl {
+    /"extern" S name=ident S "("/;
+    params=[];
+    (
+        S(); params<<type_ref();
+        (/S "," S/; params<<type_ref())*
+    )?;
+    /S ")" S ":" S/;
+    rt=type_ref();
+    ExternDecl(name, params, rt)
+}
+func decl():Decl {
+    rule_decl()|struct_decl()|extern_decl()|union_decl()
+}
+[export]
+func file():Decl {
+    decls=[];
+    (S(); decls<<decl())*;
+    S();
+    File(decls)
 }
 """
 
