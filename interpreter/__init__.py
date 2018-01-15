@@ -329,6 +329,33 @@ class Parser(object):
         self.printStack()
         raise Exception(msg)
 
+
+    def extractErrorLine(self):
+        line = 1
+        line_start = 0
+        tabs = 0
+        for i in range(0, self.deepest):
+            if self.stream[i] == '\n':
+                line += 1
+                line_start = i + 1
+                tabs = 0
+            elif self.stream[i] == '\t':
+                tabs += 1
+        line_end = self.deepest
+        while line_end < len(self.stream) and self.stream[line_end] != '\n':
+            line_end += 1
+
+        TAB_SIZE = 4
+        text = self.stream[line_start:line_end].replace('\t', ' ' * TAB_SIZE)
+        col = self.deepest - line_start + tabs * (TAB_SIZE - 1)
+
+        if self.deepest < len(self.stream):
+            c = repr(self.stream[self.deepest])
+        else:
+            c = '<EOS>'
+
+        return '%d:%d @ %s\n%s\n%s' % (line, col, c, text, ' '*col + '^')
+
     def parse(self, name, text):
         self.stream = text
         self.pos = 0
@@ -339,8 +366,5 @@ class Parser(object):
         if self.hasNext():
             self.fail()
         if not self.ok:
-            a = max(self.deepest - 1, 0)
-            b = min(self.deepest + 2, len(self.stream))
-            clip = self.stream[a:b]
-            raise ParseFailed("Error at %d: %r" % (self.deepest, clip))
+            raise ParseFailed("Error at %s" % (self.extractErrorLine()))
         return result
