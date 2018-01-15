@@ -73,6 +73,31 @@ class SchemaParser(object):
             return AnyType()
         return None
 
+    def attrs(self):
+        attrs = []
+        if not self.check_exact('@'):
+            return attrs
+        self.consume_exact('@')
+        self.s()
+        self.require_exact('[')
+        self.s()
+        name = self.ident()
+        if name is not None:
+            attrs.append(name)
+            while True:
+                self.s()
+                if not self.check_exact(','):
+                    break
+                self.consume_exact(',')
+                self.s()
+                name = self.ident()
+                if name is None:
+                    self.error('Missing attr')
+                attrs.append(name)
+        self.s()
+        self.require_exact(']')
+        return attrs
+
     def parse_field(self):
         name = self.ident()
         if not name:
@@ -83,7 +108,9 @@ class SchemaParser(object):
         t = self.type_ref()
         if not t:
             self.error('Missing type')
-        return FieldDecl(name, t, [])
+        self.s()
+        attrs = self.attrs()
+        return FieldDecl(name, t, attrs)
 
     def parse(self, schema):
         self.schema = schema
@@ -98,7 +125,7 @@ class SchemaParser(object):
             fields.append(f)
         self.s()
         if self.pos != len(self.schema):
-            self.error('Failed to parse completely')
+            self.error('Unexpected %r' % self.schema[self.pos])
         return fields
 
 
