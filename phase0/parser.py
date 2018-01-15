@@ -27,7 +27,7 @@ p.rule(Rule('esc_char',
         punc('n') & Literal('\n')
         | punc('t') & Literal('\t')
         | punc('r') & Literal('\r')
-        | Slice(Any())
+        | Slice(Character([], True))
     )
 ))
 p.rule(Rule('c',
@@ -70,7 +70,6 @@ p.rule(Rule('atom',
     | punc('<') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc('>') & Get('Slice')(Get('e'))
     | punc('$') & Get('S')() & Get('MatchValue')(Get('atom')())
     | Get('char')()
-    | punc('.') & Get('Any')()
     | Get('list_literal')()
     | Get('string_literal')()
     | Get('boolean_literal')()

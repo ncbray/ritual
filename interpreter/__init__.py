@@ -99,17 +99,6 @@ class Call(Matcher):
         return expr.call(parser, values)
 
 
-class Any(Matcher):
-    __metaclass__ = base.TreeMeta
-    __schema__ = ''
-
-    def match(self, parser):
-        if parser.hasNext():
-            parser.consume()
-        else:
-            parser.fail()
-
-
 class Range(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'lower:rune upper:rune'
@@ -287,7 +276,6 @@ def registerInterpreterTypes(p):
     p.rule(Native('Get', Get))
     p.rule(Native('Set', Set))
     p.rule(Native('Append', Append))
-    p.rule(Native('Any', Any))
 
 
 class ParseFailed(Exception):
