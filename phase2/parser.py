@@ -113,7 +113,7 @@ func escape_char():rune {
 }
 func string_value():string {
     /["]/;
-    c = [];
+    c = []rune{};
     (
         c << /escape_char | [\\]["] | [^"]/
     )*;
@@ -142,7 +142,7 @@ func char_range():Range {
 func char_match():Character {
     /[[]/;
     invert=(/[\^]/;true|false);
-    ranges = [];
+    ranges = []Range{};
     (ranges<<char_range())*;
     /[\]]/;
     Character(ranges, invert)
@@ -152,7 +152,7 @@ func match_expr_atom():Matcher {
     | /[(] S e=match_expr S [)]/; e
     | /[<] S e=match_expr S [>]/; Slice(e)
     | MatchValue(Literal(string_value()))
-    | Call(Get(ident()),[])
+    | Call(Get(ident()),[]Matcher{})
     )
 }
 func match_expr_repeat():Matcher {
@@ -176,7 +176,7 @@ func match_expr_assign():Matcher {
 func match_expr_sequence():Matcher {
     e=match_expr_assign();
     (
-        es=[e];
+        es = []Matcher{e};
         (
             S(); es<<match_expr_assign()
         )+;
@@ -187,7 +187,7 @@ func match_expr_sequence():Matcher {
 func match_expr_choice():Matcher {
     e=match_expr_sequence();
     (
-        es=[e];
+        es = []Matcher{e};
         (/S "|" S/; es<<match_expr_sequence())+;
         e=Choice(es)
     )?;
@@ -200,7 +200,7 @@ func expr_atom():Matcher {
     ( /"(" S e=expr S ")"/; e
     | /"<" S e=expr S ">"/; Slice(e)
     | /"/" S e=match_expr S "/"/; e
-    | /"["/; args = []; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "]"/; List(args)
+    | /"[]" S type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; List(args)
     | Literal(string_value())
     | Literal(int_value())
     | Literal(bool_value())
@@ -211,7 +211,7 @@ func expr_call():Matcher {
     e = expr_atom();
     (
         /S "("/;
-        args=[];
+        args = []Matcher{};
         (
             S(); args<<expr();
             (
@@ -248,7 +248,7 @@ func expr_assign():Matcher {
 func expr_sequence():Matcher {
     e=expr_assign();
     (
-        es=[e];
+        es = []Matcher{e};
         (
             /S ";" S/;
             es<<expr_assign()
@@ -260,7 +260,7 @@ func expr_sequence():Matcher {
 func expr_choice():Matcher {
     e=expr_sequence();
     (
-        es=[e];
+        es = []Matcher{e};
         (
             /S "|" S/;
             es<<expr_sequence()
@@ -283,7 +283,7 @@ func attribute():Attribute {
 }
 func attributes():[]Attribute {
     /"["/;
-    attrs=[];
+    attrs = []Attribute{};
     (
         attrs<<attribute();
         (/S "," S/; attrs<<attribute())*
@@ -292,7 +292,7 @@ func attributes():[]Attribute {
     attrs
 }
 func optional_attributes():[]Attribute {
-    attributes()|[]
+    attributes() | []Attribute{}
 }
 func rule_decl():RuleDecl {
     attrs=optional_attributes(); S();
@@ -304,21 +304,21 @@ func field_decl():FieldDecl {
 }
 func struct_decl():StructDecl {
     /"struct" S name=ident S "{"/;
-    fields=[];
+    fields = []FieldDecl{};
     (S(); fields<<field_decl())*;
     /S "}"/;
     StructDecl(name, fields)
 }
 func union_decl():UnionDecl {
     /"union" S name=ident S "=" S/;
-    refs=[type_ref()];
+    refs = []TypeRef{type_ref()};
     (/S "|" S/; refs<<type_ref())*;
     /S ";"/;
     UnionDecl(name, refs)
 }
 func extern_decl():ExternDecl {
     /"extern" S name=ident S "("/;
-    params=[];
+    params = []TypeRef{};
     (
         S(); params<<type_ref();
         (/S "," S/; params<<type_ref())*
@@ -332,7 +332,7 @@ func decl():Decl {
 }
 [export]
 func file():Decl {
-    decls=[];
+    decls = []Decl{};
     (S(); decls<<decl())*;
     S();
     File(decls)

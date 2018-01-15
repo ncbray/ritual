@@ -68,7 +68,7 @@ rule('expr_atom', r"""(
     $"("; S(); e=expr(); S(); $")"; e
     | $"<"; S(); e=expr(); S(); $">"; Slice(e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
-    | $"["; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"]"; List(args)
+    | $"[]"; S(); type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; List(args)
     | Literal(string_value())
     | Literal(int_value())
     | Literal(bool_value())
