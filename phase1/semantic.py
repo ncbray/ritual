@@ -49,17 +49,18 @@ class ResolveType(object):
     @dispatch(model.NameRef)
     def visitNameRef(cls, node, semantic):
         if node.name in set(['string', 'int', 'rune', 'void', 'bool']):
-            return node.name
+            pass
         elif node.name in semantic.globals:
             semantic.global_refs.add(node.name)
             t = semantic.globals[node.name]
             assert isinstance(t, (model.StructDecl, model.UnionDecl)), t
         else:
             raise Exception('Unknown type "%s"' % node.name)
+        return node.name
 
     @dispatch(model.ListRef)
     def visitListRef(cls, node, semantic):
-        cls.visit(node.ref, semantic)
+        return '[]' + cls.visit(node.ref, semantic)
 
 
 class CheckSignatures(object):
@@ -79,7 +80,6 @@ class CheckSignatures(object):
     def visitUnionDecl(cls, node, semantic):
         for t in node.refs:
             ResolveType.visit(t, semantic)
-
 
     @dispatch(model.ExternDecl)
     def visitExternDecl(cls, node, semantic):
@@ -113,38 +113,38 @@ class CheckRules(object):
         t = cls.visit(node.body, semantic)
         semantic.locals = old_locals
 
-    @dispatch(interpreter.Repeat)
+    @dispatch(model.Repeat)
     def visitRepeat(cls, node, semantic):
         cls.visit(node.expr, semantic)
         return 'void'
 
-    @dispatch(interpreter.Choice)
+    @dispatch(model.Choice)
     def visitChoice(cls, node, semantic):
         for expr in node.children:
             cls.visit(expr, semantic)
         return 'void'
 
-    @dispatch(interpreter.Sequence)
+    @dispatch(model.Sequence)
     def visitSequence(cls, node, semantic):
         t = 'void'
         for expr in node.children:
             t = cls.visit(expr, semantic)
         return t
 
-    @dispatch(interpreter.Character)
+    @dispatch(model.Character)
     def visitCharacter(cls, node, semantic):
         return 'rune'
 
-    @dispatch(interpreter.MatchValue)
+    @dispatch(model.MatchValue)
     def visitMatchValue(cls, node, semantic):
         return 'string' # HACK
 
-    @dispatch(interpreter.Slice)
+    @dispatch(model.Slice)
     def visitSlice(cls, node, semantic):
         cls.visit(node.expr, semantic)
         return 'string'
 
-    @dispatch(interpreter.Call)
+    @dispatch(model.Call)
     def visitCall(cls, node, semantic):
         expr = cls.visit(node.expr, semantic)
         #if not isinstance(expr, (model.RuleDecl, model.ExternDecl, model.StructDecl)):
@@ -153,25 +153,27 @@ class CheckRules(object):
             cls.visit(arg, semantic)
         return '?'
 
-    @dispatch(interpreter.List)
+    @dispatch(model.List)
     def visitList(cls, node, semantic):
+        t = ResolveType.visit(node.t, semantic)
         for arg in node.args:
-            cls.visit(arg, semantic)
-        return '[]?'
+            at = cls.visit(arg, semantic)
+            #assert t == at, (t, at, arg)
+        return '[]' + t
 
-    @dispatch(interpreter.Get)
+    @dispatch(model.Get)
     def visitGet(cls, node, semantic):
         slot = semantic.resolveSlot(node.name)
         if slot is None:
             raise Exception('Cannot resolve "%s" in %s' % (node.name, semantic.scope_name))
 
-    @dispatch(interpreter.Set)
+    @dispatch(model.Set)
     def visitSet(cls, node, semantic):
         t = cls.visit(node.expr, semantic)
         semantic.locals[node.name] = LocalSlot(t)
         return t
 
-    @dispatch(interpreter.Append)
+    @dispatch(model.Append)
     def visitAppend(cls, node, semantic):
         t = cls.visit(node.expr, semantic)
         slot = semantic.resolveSlot(node.name)
@@ -179,7 +181,7 @@ class CheckRules(object):
             raise Exception('Cannot resolve "%s" in %s' % (node.name, semantic.scope_name))
         return 'void'
 
-    @dispatch(interpreter.Literal)
+    @dispatch(model.Literal)
     def visitLiteral(cls, node, semantic):
         return '?'
 

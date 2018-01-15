@@ -1,5 +1,5 @@
 import unittest
-
+from interpreter import ParseFailed
 from parser import *
 
 class TestParser(unittest.TestCase):

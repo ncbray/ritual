@@ -200,7 +200,7 @@ func expr_atom():Matcher {
     ( /"(" S e=expr S ")"/; e
     | /"<" S e=expr S ">"/; Slice(e)
     | /"/" S e=match_expr S "/"/; e
-    | /"[]" S type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; List(args)
+    | /"[]" S t=type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; List(t, args)
     | Literal(string_value())
     | Literal(int_value())
     | Literal(bool_value())

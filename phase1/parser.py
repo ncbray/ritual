@@ -1,4 +1,4 @@
-from interpreter import *
+from interpreter import Parser, Rule, Native
 import phase0.parser
 
 import model
@@ -18,7 +18,6 @@ p.rule(Native('dec_to_int', lambda text: int(text, 10)))
 p.rule(Native('chars_to_string', lambda chars: ''.join(chars)))
 p.rule(Native('halt', halt))
 
-registerInterpreterTypes(p)
 model.registerTypes(p)
 
 rule('S', r'([[ \t\n\r]]|$"//";[[^\n]]*)*')
@@ -68,7 +67,7 @@ rule('expr_atom', r"""(
     $"("; S(); e=expr(); S(); $")"; e
     | $"<"; S(); e=expr(); S(); $">"; Slice(e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
-    | $"[]"; S(); type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; List(args)
+    | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; List(t, args)
     | Literal(string_value())
     | Literal(int_value())
     | Literal(bool_value())
