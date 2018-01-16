@@ -2,9 +2,9 @@ import phase1.parser
 
 src = r"""
 extern chr(int):rune
+extern chars_to_string([]rune):string
 extern hex_to_int(string):int
 extern dec_to_int(string):int
-extern chars_to_string([]rune):string
 
 struct Range {
     lower:rune
@@ -91,7 +91,7 @@ struct Attribute {
 union Intrinsic = string | int | bool;
 union TypeRef = NameRef | ListRef;
 union Matcher = Character | Slice | Call | MatchValue | Literal | List | Get | Set | Append | Repeat | Sequence | Choice;
-union Decl = RuleDecl;
+union Decl = RuleDecl | ExternDecl | StructDecl | UnionDecl;
 
 func S():void {
     /([ \t\n\r]|"//"[^\n]*)*/
@@ -132,7 +132,7 @@ func bool_value():bool {
     )
 }
 func char_range_char():rune {
-    /escape_char | [\\][\^\-\\] | [^\^\-\\]/
+    /escape_char | [\\] [\^\-\\\]] | [^\^\-\\\]]/
 }
 func char_range():Range {
     a=char_range_char();
@@ -142,7 +142,7 @@ func char_range():Range {
 }
 func char_match():Character {
     /[[]/;
-    invert=(/[\^]/;true|false);
+    invert = (/[\^]/;true|false);
     ranges = []Range{};
     (ranges<<char_range())*;
     /[\]]/;
@@ -340,5 +340,15 @@ func file():Decl {
 }
 """
 
-f = phase1.parser.compile(src)
-#print f
+def setup(src):
+    phase1.parser.compile('phase2_gen', src, globals())
+    p = buildParser(
+        chr=unichr,
+        chars_to_string=lambda chars: ''.join(chars),
+        hex_to_int=lambda text: int(text, 16),
+        dec_to_int=lambda text: int(text, 10),
+    )
+    p.parse('file', src)
+    return p
+
+p = setup(src)

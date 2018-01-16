@@ -304,7 +304,9 @@ class Parser(object):
         self.pos += 1
 
     def fail(self):
-        self.deepest = max(self.deepest, self.pos)
+        if self.pos > self.deepest:
+            self.deepest = self.pos
+            self.deepest_name = self.stack[-1].name if self.stack else '<EOS>'
         self.ok = False
         #print
         #self.printStack()
@@ -328,7 +330,6 @@ class Parser(object):
         print node
         self.printStack()
         raise Exception(msg)
-
 
     def extractErrorLine(self):
         line = 1
@@ -354,12 +355,13 @@ class Parser(object):
         else:
             c = '<EOS>'
 
-        return '%d:%d @ %s\n%s\n%s' % (line, col, c, text, ' '*col + '^')
+        return '%d:%d @ %s (%s)\n%s\n%s' % (line, col, c, self.deepest_name, text, ' '*col + '^')
 
     def parse(self, name, text):
         self.stream = text
         self.pos = 0
         self.deepest = 0
+        self.deepest_name = '<EOS>'
         self.ok = True
         self.stack = []
         result = self.rules[name].call(self, [])

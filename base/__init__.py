@@ -163,6 +163,7 @@ def gen_validation(fn, ft, indent):
             src += child_src
     elif isinstance(ft, NamedType):
         ft = python_types.get(ft.name, ft.name)
+        #src += indent + 'print %r, %s\n' % (ft, ft)
         src += indent + 'assert isinstance(%s, %s), (type(self), type(%s))\n' % (fn, ft, fn)
     return src
 
@@ -213,8 +214,11 @@ class TreeMeta(type):
             src += '  return "%%s(%s)" %% (%s,)' % (', '.join(pat), ', '.join(args))
 
         if src:
-            # Inject the code into the class.
-            exec src in cls_globals, dct
+            # Inject the code into the class
+            pkg = cls_globals['__name__']
+            qual = pkg + '.' if pkg else ''
+            code = compile(src, 'TreeMeta<%s%s>' % (qual, name), 'exec')
+            exec code in cls_globals, dct
 
         return super(TreeMeta, cls).__new__(cls, name, parents, dct)
 

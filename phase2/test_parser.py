@@ -1,6 +1,7 @@
 import unittest
 
-from parser import *
+import parser
 
 class TestParser(unittest.TestCase):
-    pass
+    def test_self_hosting(self):
+        parser.p.parse('file', parser.src)

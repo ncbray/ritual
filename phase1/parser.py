@@ -1,6 +1,7 @@
 from interpreter import Parser, Rule, Native
 import phase0.parser
 
+import generate_python
 import model
 import semantic
 
@@ -140,7 +141,8 @@ rule('extern_decl', r"""$"extern";
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); File(decls)""")
 
 
-def compile(text):
+def compile(name, text, out_dict):
     f = p.parse('file', text)
     semantic.process(f)
-    return f
+    src = generate_python.generate_source(f)
+    generate_python.compile_source(name, src, out_dict)
