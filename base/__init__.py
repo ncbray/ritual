@@ -135,6 +135,24 @@ python_types = {
 }
 
 
+def zero_value(t):
+    if isinstance(t, NamedType):
+        if t.name == 'string':
+            return ''
+        elif t.name == 'rune':
+            return '\0'
+        elif t.name == 'bool':
+            return False
+        elif t.name == 'int':
+            return 0
+        else:
+            return None
+    elif isinstance(t, ListType):
+        return []
+    else:
+        assert False, t
+
+
 def gen_validation(fn, ft, indent):
     src = ''
     if isinstance(ft, ListType):
@@ -163,14 +181,19 @@ class TreeMeta(type):
 
         src = ''
         if '__init__' not in dct:
-            args = ['self'] + [f.name for f in fields]
+            args = ['self'] + [f.name for f in fields if 'no_init' not in f.attrs]
             src += '\n'
             src += 'def __init__(%s):\n' % ', '.join(args)
             if fields:
                 for f in fields:
-                    src += gen_validation(f.name, f.t, '  ')
+                    if 'no_init' not in f.attrs:
+                        src += gen_validation(f.name, f.t, '  ')
                 for f in fields:
-                    src += '  self.%s = %s\n' % (f.name, f.name)
+                    if 'no_init' not in f.attrs:
+                        value = f.name
+                    else:
+                        value = repr(zero_value(f.t))
+                    src += '  self.%s = %s\n' % (f.name, value)
             else:
                 src += '  pass\n'
 
@@ -178,8 +201,13 @@ class TreeMeta(type):
             args = ['type(self).__name__']
             pat = []
             for f in fields:
-                args.append('self.' + f.name)
-                pat.append('%r')
+                if 'no_init' in f.attrs:
+                    continue
+                elif 'backedge' in f.attrs:
+                    pat.append('...')
+                else:
+                    args.append('self.' + f.name)
+                    pat.append('%r')
             src += '\n'
             src += 'def __repr__(self):\n'
             src += '  return "%%s(%s)" %% (%s,)' % (', '.join(pat), ', '.join(args))

@@ -124,6 +124,45 @@ class Attribute(object):
     __schema__ = 'name:string'
 
 
+class Type(object):
+    __slots__ = []
+
+
+class IntrinsicType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string list_cache:ListType@[no_init, backedge]'
+
+
+class Field(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string t:Type@[backedge]'
+
+
+class StructType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string fields:[]Field list_cache:ListType@[no_init, backedge]'
+
+
+class UnionType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string types:[]Type@[backedge] list_cache:ListType@[no_init, backedge]'
+
+
+class ListType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 't:Type list_cache:ListType@[no_init, backedge]'
+
+
+class CallableType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge]'
+
+
+class VoidType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = ''
+
+
 def registerTypes(p):
     p.rule(interpreter.Native('Range', Range))
     p.rule(interpreter.Native('Character', Character))

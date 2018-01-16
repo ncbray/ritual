@@ -28,6 +28,7 @@ struct Literal {
     value:Intrinsic
 }
 struct List {
+    t:TypeRef
     args:[]Matcher
 }
 struct Get {
