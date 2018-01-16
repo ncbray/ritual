@@ -262,16 +262,21 @@ class CheckRules(object):
             raise Exception('Cannot append %r to %r' % (t, lt))
         return t
 
-    @dispatch(model.Literal)
-    def visitLiteral(cls, node, semantic):
-        if isinstance(node.value, basestring):
-            return semantic.intrinsics['string'] # HACK what about rune?
-        elif isinstance(node.value, bool):
-            return semantic.intrinsics['bool']
-        elif isinstance(node.value, int):
-            return semantic.intrinsics['int']
-        else:
-            assert False, repr(node.value)
+    @dispatch(model.StringLiteral)
+    def visitStringLiteral(cls, node, semantic):
+        return semantic.intrinsics['string']
+
+    @dispatch(model.RuneLiteral)
+    def visitRuneLiteral(cls, node, semantic):
+        return semantic.intrinsics['rune']
+
+    @dispatch(model.IntLiteral)
+    def visitIntLiteral(cls, node, semantic):
+        return semantic.intrinsics['int']
+
+    @dispatch(model.BoolLiteral)
+    def visitBoolLiteral(cls, node, semantic):
+        return semantic.intrinsics['bool']
 
 
 class CheckUsed(object):

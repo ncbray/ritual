@@ -66,9 +66,24 @@ class List(Matcher):
     __schema__ = 't:TypeRef args:[]Matcher'
 
 
-class Literal(Matcher):
+class StringLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:*'
+    __schema__ = 'value:string'
+
+
+class RuneLiteral(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'value:rune'
+
+
+class IntLiteral(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'value:int'
+
+
+class BoolLiteral(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'value:bool'
 
 
 class TypeRef(object):
@@ -170,7 +185,10 @@ def registerTypes(p):
     p.rule(interpreter.Native('Repeat', Repeat))
     p.rule(interpreter.Native('Sequence', Sequence))
     p.rule(interpreter.Native('Choice', Choice))
-    p.rule(interpreter.Native('Literal', Literal))
+    p.rule(interpreter.Native('StringLiteral', StringLiteral))
+    p.rule(interpreter.Native('RuneLiteral', RuneLiteral))
+    p.rule(interpreter.Native('IntLiteral', IntLiteral))
+    p.rule(interpreter.Native('BoolLiteral', BoolLiteral))
     p.rule(interpreter.Native('Slice', Slice))
     p.rule(interpreter.Native('List', List))
     p.rule(interpreter.Native('Call', Call))

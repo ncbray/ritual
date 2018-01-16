@@ -71,6 +71,13 @@ class PythonType(object):
         return python_types.get(node.name, node.name)
 
 
+alternate_names = {
+    'StringLiteral': 'Literal',
+    'RuneLiteral': 'Literal',
+    'IntLiteral': 'Literal',
+    'BoolLiteral': 'Literal',
+}
+
 class GeneratePython(object):
     __metaclass__ = TypeDispatcher
 
@@ -90,9 +97,10 @@ class GeneratePython(object):
                     out.write(',\n')
             out.write(']')
 
-    @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character, model.Range, model.MatchValue, model.Literal, model.List, model.Slice, model.Call, model.Get, model.Set, model.Append)
+    @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character, model.Range, model.MatchValue, model.List, model.Slice, model.Call, model.Get, model.Set, model.Append, model.StringLiteral, model.RuneLiteral, model.IntLiteral, model.BoolLiteral)
     def visitNode(cls, node, out):
-        tgt = getattr(interpreter, type(node).__name__)
+        n = type(node).__name__
+        tgt = getattr(interpreter, alternate_names.get(n, n))
         out.write('interpreter.%s(' % tgt.__name__)
         dirty = False
         # Rely on name equivilence.

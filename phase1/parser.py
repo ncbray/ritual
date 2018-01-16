@@ -47,7 +47,7 @@ rule('match_expr_atom', r"""(
     char_match()
     | $"("; S(); e=match_expr(); S(); $")"; e
     | $"<"; S(); e=match_expr(); S(); $">"; Slice(e)
-    | MatchValue(Literal(string_value()))
+    | MatchValue(StringLiteral(string_value()))
     | Call(Get(ident()),[])
     )""")
 rule('match_expr_repeat', r"""e=match_expr_atom();
@@ -69,9 +69,9 @@ rule('expr_atom', r"""(
     | $"<"; S(); e=expr(); S(); $">"; Slice(e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
     | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; List(t, args)
-    | Literal(string_value())
-    | Literal(int_value())
-    | Literal(bool_value())
+    | StringLiteral(string_value())
+    | IntLiteral(int_value())
+    | BoolLiteral(bool_value())
     | Get(ident())
     )""")
 rule('expr_call', r"""e = expr_atom();

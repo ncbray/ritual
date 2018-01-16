@@ -24,8 +24,17 @@ struct Call {
 struct MatchValue {
     expr:Matcher
 }
-struct Literal {
-    value:Intrinsic
+struct StringLiteral {
+    value:string
+}
+struct RuneLiteral {
+    value:rune
+}
+struct IntLiteral {
+    value:int
+}
+struct BoolLiteral {
+    value:bool
 }
 struct List {
     t:TypeRef
@@ -88,9 +97,8 @@ struct File {
 struct Attribute {
     name:string
 }
-union Intrinsic = string | int | bool;
 union TypeRef = NameRef | ListRef;
-union Matcher = Character | Slice | Call | MatchValue | Literal | List | Get | Set | Append | Repeat | Sequence | Choice;
+union Matcher = Character | Slice | Call | MatchValue | StringLiteral | RuneLiteral | IntLiteral | BoolLiteral | List | Get | Set | Append | Repeat | Sequence | Choice;
 union Decl = RuleDecl | ExternDecl | StructDecl | UnionDecl;
 
 func S():void {
@@ -152,7 +160,7 @@ func match_expr_atom():Matcher {
     ( char_match()
     | /[(] S e=match_expr S [)]/; e
     | /[<] S e=match_expr S [>]/; Slice(e)
-    | MatchValue(Literal(string_value()))
+    | MatchValue(StringLiteral(string_value()))
     | Call(Get(ident()),[]Matcher{})
     )
 }
@@ -202,9 +210,9 @@ func expr_atom():Matcher {
     | /"<" S e=expr S ">"/; Slice(e)
     | /"/" S e=match_expr S "/"/; e
     | /"[]" S t=type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; List(t, args)
-    | Literal(string_value())
-    | Literal(int_value())
-    | Literal(bool_value())
+    | StringLiteral(string_value())
+    | IntLiteral(int_value())
+    | BoolLiteral(bool_value())
     | Get(ident())
     )
 }
