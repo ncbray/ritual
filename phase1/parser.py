@@ -62,13 +62,17 @@ rule('match_expr_assign', r"""name=ident(); S(); ($"="; S(); Set(match_expr_repe
 rule('match_expr_sequence', r"""e=match_expr_assign(); (es =[e]; (S(); es<<match_expr_assign())+; e=Sequence(es))?; e""")
 rule('match_expr_choice', r"""e=match_expr_sequence(); (es =[e]; (S(); $"|"; S(); es<<match_expr_sequence())+; e=Choice(es))?; e""")
 rule('match_expr', r"""match_expr_choice()""")
-
-
+rule('struct_literal_args', r"""args = []; (
+    args << expr();
+    (S(); $","; S(); args << expr())*
+)?;
+args""")
 rule('expr_atom', r"""(
     $"("; S(); e=expr(); S(); $")"; e
     | $"<"; S(); e=expr(); S(); $">"; Slice(e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
-    | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; List(t, args)
+    | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; ListLiteral(t, args)
+    | t=name_ref(); S(); $"{"; S(); args=struct_literal_args(); S(); $"}"; StructLiteral(t, args)
     | StringLiteral(string_value())
     | IntLiteral(int_value())
     | BoolLiteral(bool_value())
@@ -101,7 +105,9 @@ rule('expr_assign', r"""name=ident(); S(); ($"="; S(); Set(expr_repeat(), name)|
 rule('expr_sequence', r"""e=expr_assign(); (es=[e]; (S(); $";"; S(); es<<expr_assign())+; e=Sequence(es))?; e""")
 rule('expr_choice', r"""e=expr_sequence(); (es=[e]; (S(); $"|"; S(); es<<expr_sequence())+; e=Choice(es))?; e""")
 rule('expr', r"""expr_choice()""")
-rule('type_ref', r"""$"[]";ref=type_ref();ListRef(ref)|NameRef(ident())""")
+rule('name_ref', r"""NameRef(ident())""")
+rule('list_ref', r"""$"[]";ref=type_ref();ListRef(ref)""")
+rule('type_ref', r"""list_ref()|name_ref()""")
 rule('attribute', r"""Attribute(ident())""")
 rule('attributes', r"""$"[";
 attrs=[];

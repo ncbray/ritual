@@ -72,6 +72,7 @@ class PythonType(object):
 
 
 alternate_names = {
+    'ListLiteral': 'List',
     'StringLiteral': 'Literal',
     'RuneLiteral': 'Literal',
     'IntLiteral': 'Literal',
@@ -89,9 +90,16 @@ class GenerateInterpreter(object):
     def visitList(cls, node):
         return [cls.visit(child) for child in node]
 
+    @dispatch(model.StructLiteral)
+    def visitStructLiteral(cls, node):
+        return interpreter.Call(
+            interpreter.Get(node.t.name),
+            [cls.visit(arg) for arg in node.args]
+        )
+
     @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
-        model.Range, model.MatchValue, model.List, model.Slice, model.Call,
-        model.Get, model.Set, model.Append, model.StringLiteral,
+        model.Range, model.MatchValue, model.ListLiteral, model.Slice,
+        model.Call, model.Get, model.Set, model.Append, model.StringLiteral,
         model.RuneLiteral, model.IntLiteral, model.BoolLiteral)
     def visitNode(cls, node):
         # Assume named fields can be mapped to each other.

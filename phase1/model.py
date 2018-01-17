@@ -1,100 +1,114 @@
 import base
 import interpreter
 
+types = []
+
+def register(cls):
+    types.append(cls)
+    return cls
 
 class Matcher(object):
     __slots__ = []
 
-
+@register
 class Sequence(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
 
-
+@register
 class Choice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
 
-
+@register
 class Repeat(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher min:int max:int'
 
-
+@register
 class Call(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher args:[]Matcher'
 
-
+@register
 class Range(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'lower:rune upper:rune'
 
-
+@register
 class Character(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'ranges:[]Range invert:bool'
 
-
+@register
 class MatchValue(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
 
-
+@register
 class Slice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
 
-
+@register
 class Get(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string'
 
-
+@register
 class Set(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher name:string'
 
-
+@register
 class Append(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher name:string'
 
 
-class List(Matcher):
+@register
+class ListLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 't:TypeRef args:[]Matcher'
 
 
+@register
 class StringLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:string'
 
 
+@register
 class RuneLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:rune'
 
-
+@register
 class IntLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:int'
 
-
+@register
 class BoolLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:bool'
+
+@register
+class StructLiteral(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 't:NameRef args:[]Matcher'
 
 
 class TypeRef(object):
     __slots__ = []
 
 
+@register
 class NameRef(TypeRef):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string'
 
-
+@register
 class ListRef(TypeRef):
     __metaclass__ = base.TreeMeta
     __schema__ = 'ref:TypeRef'
@@ -103,37 +117,37 @@ class ListRef(TypeRef):
 class Decl(object):
     __slots__ = []
 
-
+@register
 class FieldDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string t:TypeRef'
 
-
+@register
 class StructDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string fields:[]FieldDecl'
 
-
+@register
 class UnionDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string refs:[]TypeRef'
 
-
+@register
 class ExternDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string params:[]TypeRef rt:TypeRef'
 
-
+@register
 class RuleDecl(Decl):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string rt:TypeRef body:Matcher attrs:[]Attribute'
 
-
+@register
 class File(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'decls:[]Decl'
 
-
+@register
 class Attribute(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string'
@@ -179,28 +193,5 @@ class VoidType(Type):
 
 
 def registerTypes(p):
-    p.rule(interpreter.Native('Range', Range))
-    p.rule(interpreter.Native('Character', Character))
-    p.rule(interpreter.Native('MatchValue', MatchValue))
-    p.rule(interpreter.Native('Repeat', Repeat))
-    p.rule(interpreter.Native('Sequence', Sequence))
-    p.rule(interpreter.Native('Choice', Choice))
-    p.rule(interpreter.Native('StringLiteral', StringLiteral))
-    p.rule(interpreter.Native('RuneLiteral', RuneLiteral))
-    p.rule(interpreter.Native('IntLiteral', IntLiteral))
-    p.rule(interpreter.Native('BoolLiteral', BoolLiteral))
-    p.rule(interpreter.Native('Slice', Slice))
-    p.rule(interpreter.Native('List', List))
-    p.rule(interpreter.Native('Call', Call))
-    p.rule(interpreter.Native('Get', Get))
-    p.rule(interpreter.Native('Set', Set))
-    p.rule(interpreter.Native('Append', Append))
-    p.rule(interpreter.Native('NameRef', NameRef))
-    p.rule(interpreter.Native('ListRef', ListRef))
-    p.rule(interpreter.Native('FieldDecl', FieldDecl))
-    p.rule(interpreter.Native('StructDecl', StructDecl))
-    p.rule(interpreter.Native('UnionDecl', UnionDecl))
-    p.rule(interpreter.Native('ExternDecl', ExternDecl))
-    p.rule(interpreter.Native('RuleDecl', RuleDecl))
-    p.rule(interpreter.Native('File', File))
-    p.rule(interpreter.Native('Attribute', Attribute))
+    for t in types:
+        p.rule(interpreter.Native(t.__name__, t))

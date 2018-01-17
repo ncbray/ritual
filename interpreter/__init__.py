@@ -179,7 +179,7 @@ class Set(Matcher):
         result = self.expr.match(parser)
         if parser.ok:
             if isinstance(result, Callable):
-                parser.internalError(self, "Should not be storing a Callable to %r" % self.name)
+                parser.internalError(self, "Should not be storing a Callable to %r: %r" % (self.name, result))
             lcls = parser.stack[-1].scope
             lcls[self.name] = result
         return result
@@ -194,7 +194,7 @@ class Append(Matcher):
         if parser.ok:
             n = self.name
             if isinstance(result, Callable):
-                parser.internalError(self, "Should not be storing a Callable to %r" % n)
+                parser.internalError(self, "Should not be storing a Callable to %r: %r" % (self.name, result))
             lcls = parser.stack[-1].scope
             if n not in lcls:
                 parser.internalError(self, "Unbound name %r" % n)

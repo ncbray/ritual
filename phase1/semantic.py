@@ -166,8 +166,12 @@ class CheckRules(object):
         old_locals = semantic.locals
         semantic.scope_name = node.name
         semantic.locals = {}
-        t = cls.visit(node.body, semantic)
+        expected = ResolveType.visit(node.rt, semantic)
+        actual = cls.visit(node.body, semantic)
+        #if not can_hold(expected, actual):
+        #    raise Exception('Expected return type of %r, got %r instead in %s.' % (expected, actual, semantic.scope_name))
         semantic.locals = old_locals
+        semantic.scope_name = old_name
 
     @dispatch(model.Repeat)
     def visitRepeat(cls, node, semantic):
@@ -210,14 +214,7 @@ class CheckRules(object):
     @dispatch(model.Call)
     def visitCall(cls, node, semantic):
         t = cls.visit(node.expr, semantic)
-        if isinstance(t, model.StructType):
-            # TODO check arg types.
-            at = [cls.visit(arg, semantic) for arg in node.args]
-            assert len(t.fields) == len(at), (node, t.fields, at)
-            for f, at in zip(t.fields, at):
-                assert can_hold(f.t, at), (f.t, at)
-            return t
-        elif isinstance(t, model.CallableType):
+        if isinstance(t, model.CallableType):
             assert t.rt, t
             at = [cls.visit(arg, semantic) for arg in node.args]
             assert len(t.params) == len(at), (node, t.params, at)
@@ -227,8 +224,20 @@ class CheckRules(object):
         else:
             raise Exception('Cannot call %r in %s' % (type(t), semantic.scope_name))
 
+    @dispatch(model.StructLiteral)
+    def visitStructLiteral(cls, node, semantic):
+        t = ResolveType.visit(node.t, semantic)
+        if isinstance(t, model.StructType):
+            # TODO check arg types.
+            at = [cls.visit(arg, semantic) for arg in node.args]
+            assert len(t.fields) == len(at), (node, t.fields, at)
+            for f, at in zip(t.fields, at):
+                assert can_hold(f.t, at), (t, f.name, f.t, at)
+            return t
+        else:
+            raise Exception('Not a struct: %r in %s' % (t, semantic.scope_name))
 
-    @dispatch(model.List)
+    @dispatch(model.ListLiteral)
     def visitList(cls, node, semantic):
         t = ResolveType.visit(node.t, semantic)
         for arg in node.args:
