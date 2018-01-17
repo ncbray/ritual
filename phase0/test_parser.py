@@ -1,5 +1,5 @@
 import unittest
-from interpreter import Parser, Rule, ParseFailed, Native
+from interpreter import Parser, Rule, ParseFailed, Native, Param
 import parser
 
 
@@ -112,6 +112,6 @@ class TestParser(unittest.TestCase):
 
     def test_call(self):
         p = Parser()
-        p.rule(Native('add', lambda a, b: a + b))
+        p.rule(Native('add', [Param('a'), Param('b')], lambda a, b: a + b))
         p.rule(Rule('test', parser.text_match(r'add(1, 2)')))
         self.assertEqual(p.parse("test", ""), 3)

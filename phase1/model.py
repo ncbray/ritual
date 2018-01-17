@@ -1,11 +1,12 @@
 import base
 import interpreter
 
-types = []
 
+types = []
 def register(cls):
     types.append(cls)
     return cls
+
 
 class Matcher(object):
     __slots__ = []
@@ -133,9 +134,14 @@ class UnionDecl(Decl):
     __schema__ = 'name:string refs:[]TypeRef'
 
 @register
+class Param(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string t:TypeRef'
+
+@register
 class ExternDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string params:[]TypeRef rt:TypeRef'
+    __schema__ = 'name:string params:[]Param rt:TypeRef'
 
 @register
 class RuleDecl(Decl):
@@ -194,4 +200,4 @@ class VoidType(Type):
 
 def registerTypes(p):
     for t in types:
-        p.rule(interpreter.Native(t.__name__, t))
+        p.rule(interpreter.Native(t.__name__, [interpreter.Param(slot) for slot in t.__slots__], t))

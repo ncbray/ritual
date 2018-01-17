@@ -1,5 +1,12 @@
 import base
 
+
+types = []
+def register(cls):
+    types.append(cls)
+    return cls
+
+
 class Matcher(object):
     __slots__ = []
     def match(self, parser):
@@ -15,6 +22,7 @@ class Matcher(object):
         return Call(self, list(args))
 
 
+@register
 class Sequence(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
@@ -35,6 +43,7 @@ class Sequence(Matcher):
         return Sequence(self.children + others)
 
 
+@register
 class Choice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
@@ -58,6 +67,7 @@ class Choice(Matcher):
         return Choice(self.children + others)
 
 
+@register
 class Repeat(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher min:int max:int'
@@ -80,6 +90,7 @@ class Repeat(Matcher):
         # TODO collect list?
 
 
+@register
 class Call(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher args:[]Matcher'
@@ -99,11 +110,13 @@ class Call(Matcher):
         return expr.call(parser, values)
 
 
+@register
 class Range(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'lower:rune upper:rune'
 
 
+@register
 class Character(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'ranges:[]Range invert:bool'
@@ -127,6 +140,7 @@ class Character(Matcher):
         return c
 
 
+@register
 class MatchValue(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
@@ -144,6 +158,7 @@ class MatchValue(Matcher):
         return expr
 
 
+@register
 class Slice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
@@ -156,6 +171,7 @@ class Slice(Matcher):
         return result
 
 
+@register
 class Get(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string'
@@ -171,6 +187,7 @@ class Get(Matcher):
             parser.internalError(self, "Unbound name %r" % n)
 
 
+@register
 class Set(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher name:string'
@@ -185,6 +202,7 @@ class Set(Matcher):
         return result
 
 
+@register
 class Append(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher name:string'
@@ -205,6 +223,7 @@ class Append(Matcher):
         return result
 
 
+@register
 class List(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'args:[]Matcher'
@@ -219,12 +238,18 @@ class List(Matcher):
         return values
 
 
+@register
 class Literal(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:*'
 
     def match(self, parser):
         return self.value
+
+
+class Param(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string'
 
 
 class Callable(object):
@@ -252,9 +277,11 @@ class Rule(Callable):
 
 class Native(Callable):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string func:*'
+    __schema__ = 'name:string params:[]Param func:*'
 
     def call(self, parser, args):
+        if len(args) != len(self.params):
+            parser.internalError(self, 'Expected %d arguments for %s, got %d' % (len(self.params), self.name, len(args)))
         try:
             return self.func(*args)
         except:
@@ -263,28 +290,19 @@ class Native(Callable):
 
 
 def registerInterpreterTypes(p):
-    p.rule(Native('Range', Range))
-    p.rule(Native('Character', Character))
-    p.rule(Native('MatchValue', MatchValue))
-    p.rule(Native('Repeat', Repeat))
-    p.rule(Native('Sequence', Sequence))
-    p.rule(Native('Choice', Choice))
-    p.rule(Native('Literal', Literal))
-    p.rule(Native('Slice', Slice))
-    p.rule(Native('List', List))
-    p.rule(Native('Call', Call))
-    p.rule(Native('Get', Get))
-    p.rule(Native('Set', Set))
-    p.rule(Native('Append', Append))
+    for t in types:
+        p.rule(Native(t.__name__, [Param(slot) for slot in t.__slots__], t))
 
 
 class ParseFailed(Exception):
     pass
 
+
 class StackFrame(object):
     def __init__(self, name):
         self.name = name
         self.scope = {}
+
 
 class Parser(object):
     def __init__(self):

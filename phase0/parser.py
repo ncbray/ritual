@@ -14,8 +14,8 @@ def optional(e):
 
 p = Parser()
 
-p.rule(Native('chars_to_string', lambda chars: ''.join(chars)))
-p.rule(Native('string_to_int', lambda text: int(text, 0)))
+p.rule(Native('chars_to_string', [Param('chars')], lambda chars: ''.join(chars)))
+p.rule(Native('string_to_int', [Param('text')], lambda text: int(text, 0)))
 
 registerInterpreterTypes(p)
 

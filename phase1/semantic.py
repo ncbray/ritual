@@ -138,7 +138,7 @@ class CheckSignatures(object):
     @dispatch(model.ExternDecl)
     def visitExternDecl(cls, node, semantic):
         nt = semantic.resolveSlot(node.name) # HACK
-        nt.params = [ResolveType.visit(p, semantic) for p in node.params]
+        nt.params = [ResolveType.visit(p.t, semantic) for p in node.params]
         nt.rt = ResolveType.visit(node.rt, semantic)
 
     @dispatch(model.RuleDecl)

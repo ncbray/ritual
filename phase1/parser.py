@@ -1,4 +1,4 @@
-from interpreter import Parser, Rule, Native
+from interpreter import Parser, Rule, Native, Param
 import phase0.parser
 
 import generate_python
@@ -13,11 +13,11 @@ def rule(name, body):
 def halt():
     import pdb;pdb.set_trace()
 
-p.rule(Native('chr', unichr))
-p.rule(Native('hex_to_int', lambda text: int(text, 16)))
-p.rule(Native('dec_to_int', lambda text: int(text, 10)))
-p.rule(Native('chars_to_string', lambda chars: ''.join(chars)))
-p.rule(Native('halt', halt))
+p.rule(Native('chr', [Param('i')], unichr))
+p.rule(Native('hex_to_int', [Param('text')], lambda text: int(text, 16)))
+p.rule(Native('dec_to_int', [Param('text')], lambda text: int(text, 10)))
+p.rule(Native('chars_to_string', [Param('chars')], lambda chars: ''.join(chars)))
+p.rule(Native('halt', [], halt))
 
 model.registerTypes(p)
 
@@ -133,14 +133,15 @@ S(); refs=[type_ref()];
 (S(); $"|"; S(); refs<<type_ref())*;
 S(); $";";
 UnionDecl(name, refs)""")
+rule('param', r"""name=ident(); S(); $":"; S(); t=type_ref(); Param(name, t)""")
 rule('extern_decl', r"""$"extern";
     S();
     name=ident();
     S(); $"(";
     params=[];
     (
-        S(); params<<type_ref();
-        (S(); $","; S(); params<<type_ref())*
+        S(); params<<param();
+        (S(); $","; S(); params<<param())*
     )?;
     S(); $")"; S(); $":"; S();
     rt=type_ref(); ExternDecl(name, params, rt)""")

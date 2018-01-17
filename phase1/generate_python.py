@@ -216,11 +216,12 @@ import interpreter
             out.write('\n')
             out.write('# Register struct types\n')
             for decl in structs:
-                out.write('p.rule(interpreter.Native(%r, %s))\n' % (decl.name, decl.name))
+                out.write('p.rule(interpreter.Native(%r, [interpreter.Param(slot) for slot in %s.__slots__], %s))\n' % (decl.name, decl.name, decl.name))
             out.write('\n')
             out.write('# Register externs\n')
             for decl in externs:
-                out.write('p.rule(interpreter.Native(%r, %s))\n' % (decl.name, decl.name))
+                params = ['interpreter.Param(%r)' % p.name for p in decl.params]
+                out.write('p.rule(interpreter.Native(%r, [%s], %s))\n' % (decl.name, ', '.join(params), decl.name))
 
             out.write('\nreturn p\n')
 

@@ -1,10 +1,10 @@
 import phase1.parser
 
 src = r"""
-extern chr(int):rune
-extern chars_to_string([]rune):string
-extern hex_to_int(string):int
-extern dec_to_int(string):int
+extern chr(i:int):rune
+extern chars_to_string(chars:[]rune):string
+extern hex_to_int(text:string):int
+extern dec_to_int(text:string):int
 
 struct Range {
     lower:rune
@@ -72,6 +72,10 @@ struct NameRef {
 struct ListRef {
     ref:TypeRef
 }
+struct Param {
+    name:string
+    t:TypeRef
+}
 struct RuleDecl {
     name:string
     rt:TypeRef
@@ -80,7 +84,7 @@ struct RuleDecl {
 }
 struct ExternDecl {
     name:string
-    params:[]TypeRef
+    params:[]Param
     rt:TypeRef
 }
 struct FieldDecl {
@@ -323,6 +327,20 @@ func attributes():[]Attribute {
 func optional_attributes():[]Attribute {
     attributes() | []Attribute{}
 }
+func param():Param {
+    /name=ident S ":" S t=type_ref/;
+    Param{name, t}
+}
+func param_list():[]Param {
+    /"("/;
+    params = []Param{};
+    (
+        S(); params<<param();
+        (/S "," S/; params<<param())*
+    )?;
+    /S ")"/;
+    params
+}
 func rule_decl():RuleDecl {
     attrs=optional_attributes(); S();
     /"func" S name=ident S "(" S ")" S ":" S rt=type_ref S "{" S body=expr S "}"/;
@@ -346,14 +364,7 @@ func union_decl():UnionDecl {
     UnionDecl{name, refs}
 }
 func extern_decl():ExternDecl {
-    /"extern" S name=ident S "("/;
-    params = []TypeRef{};
-    (
-        S(); params<<type_ref();
-        (/S "," S/; params<<type_ref())*
-    )?;
-    /S ")" S ":" S/;
-    rt=type_ref();
+    /"extern" S name=ident S params=param_list S ":" S rt=type_ref/;
     ExternDecl{name, params, rt}
 }
 func decl():Decl {
