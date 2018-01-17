@@ -360,7 +360,7 @@ func decl():Decl {
     rule_decl()|struct_decl()|extern_decl()|union_decl()
 }
 [export]
-func file():Decl {
+func file():File {
     decls = []Decl{};
     (S(); decls<<decl())*;
     S();
