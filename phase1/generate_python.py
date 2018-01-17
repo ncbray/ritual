@@ -78,7 +78,31 @@ alternate_names = {
     'BoolLiteral': 'Literal',
 }
 
-class GeneratePython(object):
+class GenerateInterpreter(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(int, str, unicode, bool)
+    def visitIntrinstic(cls, node):
+        return node
+
+    @dispatch(list)
+    def visitList(cls, node):
+        return [cls.visit(child) for child in node]
+
+    @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
+        model.Range, model.MatchValue, model.List, model.Slice, model.Call,
+        model.Get, model.Set, model.Append, model.StringLiteral,
+        model.RuneLiteral, model.IntLiteral, model.BoolLiteral)
+    def visitNode(cls, node):
+        # Assume named fields can be mapped to each other.
+        n = type(node).__name__
+        tgt = getattr(interpreter, alternate_names.get(n, n))
+        slots = tgt.__slots__
+        args = [cls.visit(getattr(node, slot)) for slot in slots]
+        return tgt(*args)
+
+
+class SerializeInterpreter(object):
     __metaclass__ = TypeDispatcher
 
     @dispatch(int, str, unicode, bool)
@@ -97,14 +121,15 @@ class GeneratePython(object):
                     out.write(',\n')
             out.write(']')
 
-    @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character, model.Range, model.MatchValue, model.List, model.Slice, model.Call, model.Get, model.Set, model.Append, model.StringLiteral, model.RuneLiteral, model.IntLiteral, model.BoolLiteral)
+    @dispatch(interpreter.Choice, interpreter.Sequence, interpreter.Repeat,
+        interpreter.Character, interpreter.Range,
+        interpreter.MatchValue, interpreter.List, interpreter.Slice,
+        interpreter.Call, interpreter.Get, interpreter.Set,interpreter.Append,
+        interpreter.Literal)
     def visitNode(cls, node, out):
-        n = type(node).__name__
-        tgt = getattr(interpreter, alternate_names.get(n, n))
-        out.write('interpreter.%s(' % tgt.__name__)
+        out.write('interpreter.%s(' % type(node).__name__)
         dirty = False
-        # Rely on name equivilence.
-        slots = tgt.__slots__
+        slots = type(node).__slots__
         if len(slots) == 1:
             cls.visit(getattr(node, slots[0]), out)
         else:
@@ -122,6 +147,10 @@ class GeneratePython(object):
                 out.dedent()
         out.write(')')
 
+
+class GeneratePython(object):
+    __metaclass__ = TypeDispatcher
+
     @dispatch(model.StructDecl)
     def visitStruct(cls, node, out):
         out.write('\n\n')
@@ -132,7 +161,6 @@ class GeneratePython(object):
             for f in node.fields:
                 field_text.append('%s:%s' % (f.name, TreeType.visit(f.t)))
             out.write('__schema__ = \'%s\'\n' % ' '.join(field_text))
-
 
     @dispatch(model.UnionDecl)
     def visitUnion(cls, node, out):
@@ -174,7 +202,8 @@ import interpreter
             out.write('\n')
             for decl in rules:
                 out.write('p.rule(interpreter.Rule(%r, ' % decl.name)
-                cls.visit(decl.body, out)
+                interp = GenerateInterpreter.visit(decl.body)
+                SerializeInterpreter.visit(interp, out)
                 out.write('))\n')
             out.write('\n')
             out.write('# Register struct types\n')
