@@ -1,4 +1,5 @@
 from interpreter import Parser, Rule, Native, Param
+import interpreter.location
 import phase0.parser
 
 import generate_python
@@ -23,7 +24,7 @@ model.registerTypes(p)
 
 rule('S', r'([[ \t\n\r]]|$"//";[[^\n]]*)*')
 rule('hex_digit', r'[[0-9a-fA-F]]')
-rule('ident', r'<[[a-zA-Z_]];[[a-zA-Z_0-9]]*>')
+rule('ident', r'Token(loc(), <[[a-zA-Z_]];[[a-zA-Z_0-9]]*>)')
 # TODO unicode escapes?
 rule('escape_char', r"""[[\\]];
     ( [[n]]; chr(0x0A)
@@ -48,6 +49,7 @@ rule('match_expr_atom', r"""(
     | $"("; S(); e=match_expr(); S(); $")"; e
     | $"<"; S(); e=match_expr(); S(); $">"; Slice(e)
     | MatchValue(StringLiteral(string_value()))
+    | $"loc"; Location()
     | Call(Get(ident()),[])
     )""")
 rule('match_expr_repeat', r"""e=match_expr_atom();
@@ -76,6 +78,7 @@ rule('expr_atom', r"""(
     | StringLiteral(string_value())
     | IntLiteral(int_value())
     | BoolLiteral(bool_value())
+    | $"loc"; S(); $"("; S(); $")"; Location()
     | Get(ident())
     )""")
 rule('expr_call', r"""e = expr_atom();
@@ -148,8 +151,26 @@ rule('extern_decl', r"""$"extern";
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); File(decls)""")
 
 
+class CompileStatus(object):
+    def __init__(self, text):
+        self.text = text
+        self.errors = 0
+
+    def error(self, msg, loc=None):
+        if loc is None:
+            print 'ERROR %s' % msg
+        else:
+            info = interpreter.location.extractLocationInfo(self.text, loc)
+            print 'ERROR %d:%d: %s\n%s\n%s' % (info.line, info.column, msg, info.text, info.arrow)
+        self.errors += 1
+
+    def halt_if_errors(self):
+        if self.errors:
+            raise Exception('Halting due to errors.')
+
 def compile(name, text, out_dict):
+    status = CompileStatus(text)
     f = p.parse('file', text)
-    semantic.process(f)
+    semantic.process(f, status)
     src = generate_python.generate_source(f)
     generate_python.compile_source(name, src, out_dict)

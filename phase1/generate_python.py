@@ -50,13 +50,17 @@ class TabbedWriter(object):
                 self.out.write(b)
             self.out.write('\n')
 
+alternate_tree_names = {
+    'location': 'int',
+}
 
 class TreeType(object):
     __metaclass__ = TypeDispatcher
 
     @dispatch(model.NameRef)
     def visitNameRef(cls, node):
-        return node.name
+        name = node.name.text
+        return alternate_tree_names.get(name, name)
 
     @dispatch(model.ListRef)
     def visitListRef(cls, node):
@@ -68,7 +72,8 @@ class PythonType(object):
 
     @dispatch(model.NameRef)
     def visitNameRef(cls, node):
-        return python_types.get(node.name, node.name)
+        name = node.name.text
+        return python_types.get(name, name)
 
 
 alternate_names = {
@@ -90,17 +95,21 @@ class GenerateInterpreter(object):
     def visitList(cls, node):
         return [cls.visit(child) for child in node]
 
+    @dispatch(model.Token)
+    def visitToken(cls, node):
+        return node.text
+
     @dispatch(model.StructLiteral)
     def visitStructLiteral(cls, node):
         return interpreter.Call(
-            interpreter.Get(node.t.name),
+            interpreter.Get(TreeType.visit(node.t)),
             [cls.visit(arg) for arg in node.args]
         )
 
     @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
         model.Range, model.MatchValue, model.ListLiteral, model.Slice,
         model.Call, model.Get, model.Set, model.Append, model.StringLiteral,
-        model.RuneLiteral, model.IntLiteral, model.BoolLiteral)
+        model.RuneLiteral, model.IntLiteral, model.BoolLiteral, model.Location)
     def visitNode(cls, node):
         # Assume named fields can be mapped to each other.
         n = type(node).__name__
@@ -133,7 +142,7 @@ class SerializeInterpreter(object):
         interpreter.Character, interpreter.Range,
         interpreter.MatchValue, interpreter.List, interpreter.Slice,
         interpreter.Call, interpreter.Get, interpreter.Set,interpreter.Append,
-        interpreter.Literal)
+        interpreter.Literal, interpreter.Location)
     def visitNode(cls, node, out):
         out.write('interpreter.%s(' % type(node).__name__)
         dirty = False
@@ -162,19 +171,19 @@ class GeneratePython(object):
     @dispatch(model.StructDecl)
     def visitStruct(cls, node, out):
         out.write('\n\n')
-        out.write('class %s(object):\n' % node.name)
+        out.write('class %s(object):\n' % node.name.text)
         with out.block():
             out.write('__metaclass__ = base.TreeMeta\n')
             field_text = []
             for f in node.fields:
-                field_text.append('%s:%s' % (f.name, TreeType.visit(f.t)))
+                field_text.append('%s:%s' % (f.name.text, TreeType.visit(f.t)))
             out.write('__schema__ = \'%s\'\n' % ' '.join(field_text))
 
     @dispatch(model.UnionDecl)
     def visitUnion(cls, node, out):
         out.write('\n\n')
         types = [PythonType.visit(t) for t in node.refs]
-        out.write('%s = tuple([%s])\n' % (node.name, ', '.join(types)))
+        out.write('%s = tuple([%s])\n' % (node.name.text, ', '.join(types)))
 
     @dispatch(model.File)
     def visitFile(cls, node, out):
@@ -204,24 +213,26 @@ import interpreter
             cls.visit(decl, out)
 
         out.write('\n\n')
-        out.write('def buildParser(%s):\n' % ', '.join([e.name for e in externs]))
+        out.write('def buildParser(%s):\n' % ', '.join([e.name.text for e in externs]))
         with out.block():
             out.write('p = interpreter.Parser()\n')
             out.write('\n')
             for decl in rules:
-                out.write('p.rule(interpreter.Rule(%r, ' % decl.name)
+                out.write('p.rule(interpreter.Rule(%r, ' % decl.name.text)
                 interp = GenerateInterpreter.visit(decl.body)
                 SerializeInterpreter.visit(interp, out)
                 out.write('))\n')
             out.write('\n')
             out.write('# Register struct types\n')
             for decl in structs:
-                out.write('p.rule(interpreter.Native(%r, [interpreter.Param(slot) for slot in %s.__slots__], %s))\n' % (decl.name, decl.name, decl.name))
+                name = decl.name.text
+                out.write('p.rule(interpreter.Native(%r, [interpreter.Param(slot) for slot in %s.__slots__], %s))\n' % (name, name, name))
             out.write('\n')
             out.write('# Register externs\n')
             for decl in externs:
-                params = ['interpreter.Param(%r)' % p.name for p in decl.params]
-                out.write('p.rule(interpreter.Native(%r, [%s], %s))\n' % (decl.name, ', '.join(params), decl.name))
+                params = ['interpreter.Param(%r)' % p.name.text for p in decl.params]
+                name = decl.name.text
+                out.write('p.rule(interpreter.Native(%r, [%s], %s))\n' % (name, ', '.join(params), name))
 
             out.write('\nreturn p\n')
 

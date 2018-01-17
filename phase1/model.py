@@ -8,69 +8,92 @@ def register(cls):
     return cls
 
 
+@register
+class Token(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'loc:int text:string'
+
+
 class Matcher(object):
     __slots__ = []
+
 
 @register
 class Sequence(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
 
+
 @register
 class Choice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'children:[]Matcher'
+
 
 @register
 class Repeat(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher min:int max:int'
 
+
 @register
 class Call(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher args:[]Matcher'
+
 
 @register
 class Range(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'lower:rune upper:rune'
 
+
 @register
 class Character(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'ranges:[]Range invert:bool'
+
 
 @register
 class MatchValue(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
 
+
 @register
 class Slice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'
 
+
 @register
 class Get(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string'
+    __schema__ = 'name:Token'
+
 
 @register
 class Set(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher name:string'
+    __schema__ = 'expr:Matcher name:Token'
+
 
 @register
 class Append(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher name:string'
+    __schema__ = 'expr:Matcher name:Token'
 
 
 @register
 class ListLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 't:TypeRef args:[]Matcher'
+
+
+@register
+class Location(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = ''
 
 
 @register
@@ -84,15 +107,18 @@ class RuneLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:rune'
 
+
 @register
 class IntLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:int'
 
+
 @register
 class BoolLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'value:bool'
+
 
 @register
 class StructLiteral(Matcher):
@@ -107,7 +133,8 @@ class TypeRef(object):
 @register
 class NameRef(TypeRef):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string'
+    __schema__ = 'name:Token'
+
 
 @register
 class ListRef(TypeRef):
@@ -118,45 +145,53 @@ class ListRef(TypeRef):
 class Decl(object):
     __slots__ = []
 
+
 @register
 class FieldDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string t:TypeRef'
+    __schema__ = 'name:Token t:TypeRef'
+
 
 @register
 class StructDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string fields:[]FieldDecl'
+    __schema__ = 'name:Token fields:[]FieldDecl'
+
 
 @register
 class UnionDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string refs:[]TypeRef'
+    __schema__ = 'name:Token refs:[]TypeRef'
+
 
 @register
 class Param(object):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string t:TypeRef'
+    __schema__ = 'name:Token t:TypeRef'
+
 
 @register
 class ExternDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string params:[]Param rt:TypeRef'
+    __schema__ = 'name:Token params:[]Param rt:TypeRef'
+
 
 @register
 class RuleDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string rt:TypeRef body:Matcher attrs:[]Attribute'
+    __schema__ = 'name:Token rt:TypeRef body:Matcher attrs:[]Attribute'
+
 
 @register
 class File(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'decls:[]Decl'
 
+
 @register
 class Attribute(object):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string'
+    __schema__ = 'name:Token'
 
 
 class Type(object):

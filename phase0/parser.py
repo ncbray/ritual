@@ -74,6 +74,7 @@ p.rule(Rule('atom',
     | Get('string_literal')()
     | Get('boolean_literal')()
     | Get('int_literal')()
+    | tok('loc') & Get('S')() & punc('(') & Get('S')() & punc(')') & Get('Location')()
     | Get('Get')(Get('ident')())
 ))
 p.rule(Rule('call',

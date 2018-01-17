@@ -5,7 +5,7 @@ from parser import *
 class TestParser(unittest.TestCase):
     def test_ident(self):
         for ident in ["FooBar", "foo_bar", "_", 'f123']:
-            self.assertEqual(p.parse("ident", ident), ident)
+            self.assertEqual(p.parse("ident", ident).text, ident)
         for ident in ['123', '', '$']:
             with self.assertRaises(ParseFailed):
                 p.parse('ident', ident)

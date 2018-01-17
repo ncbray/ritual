@@ -1,4 +1,5 @@
 import base
+import location
 
 
 types = []
@@ -247,6 +248,15 @@ class Literal(Matcher):
         return self.value
 
 
+@register
+class Location(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = ''
+
+    def match(self, parser):
+        return parser.pos
+
+
 class Param(object):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string'
@@ -350,30 +360,8 @@ class Parser(object):
         raise Exception(msg)
 
     def extractErrorLine(self):
-        line = 1
-        line_start = 0
-        tabs = 0
-        for i in range(0, self.deepest):
-            if self.stream[i] == '\n':
-                line += 1
-                line_start = i + 1
-                tabs = 0
-            elif self.stream[i] == '\t':
-                tabs += 1
-        line_end = self.deepest
-        while line_end < len(self.stream) and self.stream[line_end] != '\n':
-            line_end += 1
-
-        TAB_SIZE = 4
-        text = self.stream[line_start:line_end].replace('\t', ' ' * TAB_SIZE)
-        col = self.deepest - line_start + tabs * (TAB_SIZE - 1)
-
-        if self.deepest < len(self.stream):
-            c = repr(self.stream[self.deepest])
-        else:
-            c = '<EOS>'
-
-        return '%d:%d @ %s (%s)\n%s\n%s' % (line, col, c, self.deepest_name, text, ' '*col + '^')
+        info = location.extractLocationInfo(self.stream, self.deepest)
+        return '%d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.deepest_name, info.text, info.arrow)
 
     def parse(self, name, text):
         self.stream = text

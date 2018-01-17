@@ -27,7 +27,8 @@ class LocalSlot(object):
 
 
 class SemanticPass(object):
-    def __init__(self):
+    def __init__(self, status):
+        self.status = status
         self.scope_name = 'global'
         self.globals = {}
         self.global_refs = set()
@@ -35,24 +36,32 @@ class SemanticPass(object):
 
         self.void = model.VoidType()
         self.intrinsics = {}
-        for n in ['string', 'rune', 'bool', 'int']:
+        for n in ['string', 'rune', 'bool', 'int', 'location']:
             self.intrinsics[n] = model.IntrinsicType(n)
 
+    def globalIsUsed(self, name):
+        assert isinstance(name, basestring), name
+        self.global_refs.add(name)
+
     def resolveSlot(self, name):
+        assert isinstance(name, basestring), name
         if name in self.locals:
             return self.locals[name]
         if name in self.globals:
-            self.global_refs.add(name)
+            self.globalIsUsed(name)
             return self.globals[name]
 
-    def declareGlobal(self, name, t):
+    def declareGlobal(self, name, t, loc):
+        assert isinstance(name, basestring), name
         assert not isinstance(t, model.VoidType)
         if name in self.globals:
-            raise Exception('Attempted to redefine "%s"' % name)
-        assert isinstance(t, model.Type), t
-        self.globals[name] = t
+            self.status.error('Attempted to redefine "%s"' % name, loc)
+        else:
+            assert isinstance(t, model.Type), t
+            self.globals[name] = t
 
     def setLocal(self, name, t):
+        assert isinstance(name, basestring), name
         assert isinstance(t, model.Type), t
         assert not isinstance(t, model.VoidType), (self.scope_name, name)
         if name in self.locals:
@@ -76,23 +85,26 @@ class IndexGlobals(object):
 
     @dispatch(model.RuleDecl, model.ExternDecl)
     def visitCallableDecl(cls, node, semantic):
-        t = model.CallableType(node.name)
-        semantic.declareGlobal(node.name, t)
+        name = node.name.text
+        t = model.CallableType(name)
+        semantic.declareGlobal(name, t, node.name.loc)
         if hasattr(node, 'attrs'):
             for attr in node.attrs:
-                if attr.name == 'export':
+                if attr.name.text == 'export':
                     # Mark exported decls as used.
-                    semantic.global_refs.add(node.name)
+                    semantic.globalIsUsed(name)
 
     @dispatch(model.StructDecl)
     def visitStructDecl(cls, node, semantic):
-        t = model.StructType(node.name, [])
-        semantic.declareGlobal(node.name, t)
+        name = node.name.text
+        t = model.StructType(name, [])
+        semantic.declareGlobal(name, t, node.name.loc)
 
     @dispatch(model.UnionDecl)
     def visitUnionDecl(cls, node, semantic):
-        t = model.UnionType(node.name, [])
-        semantic.declareGlobal(node.name, t)
+        name = node.name.text
+        t = model.UnionType(name, [])
+        semantic.declareGlobal(name, t, node.name.loc)
 
 
 class ResolveType(object):
@@ -100,16 +112,16 @@ class ResolveType(object):
 
     @dispatch(model.NameRef)
     def visitNameRef(cls, node, semantic):
-        if node.name == 'void':
+        name = node.name.text
+        if name == 'void':
             return semantic.void
-        elif node.name in semantic.intrinsics:
-            return semantic.intrinsics[node.name]
-        elif node.name in semantic.globals:
-            semantic.global_refs.add(node.name)
-            return semantic.globals[node.name]
+        elif name in semantic.intrinsics:
+            return semantic.intrinsics[name]
+        elif name in semantic.globals:
+            semantic.globalIsUsed(name)
+            return semantic.globals[name]
         else:
-            raise Exception('Unknown type "%s"' % node.name)
-        return node.name
+            raise Exception('Unknown type "%s"' % name)
 
     @dispatch(model.ListRef)
     def visitListRef(cls, node, semantic):
@@ -126,24 +138,24 @@ class CheckSignatures(object):
 
     @dispatch(model.StructDecl)
     def visitStruct(cls, node, semantic):
-        nt = semantic.resolveSlot(node.name) # HACK
+        nt = semantic.globals[node.name.text] # HACK
         for f in node.fields:
-            nt.fields.append(model.Field(f.name, ResolveType.visit(f.t, semantic)))
+            nt.fields.append(model.Field(f.name.text, ResolveType.visit(f.t, semantic)))
 
     @dispatch(model.UnionDecl)
     def visitUnionDecl(cls, node, semantic):
-        nt = semantic.resolveSlot(node.name) # HACK
+        nt = semantic.globals[node.name.text] # HACK
         nt.types = [ResolveType.visit(r, semantic) for r in node.refs]
 
     @dispatch(model.ExternDecl)
     def visitExternDecl(cls, node, semantic):
-        nt = semantic.resolveSlot(node.name) # HACK
+        nt = semantic.globals[node.name.text] # HACK
         nt.params = [ResolveType.visit(p.t, semantic) for p in node.params]
         nt.rt = ResolveType.visit(node.rt, semantic)
 
     @dispatch(model.RuleDecl)
     def visitRuleDecl(cls, node, semantic):
-        nt = semantic.resolveSlot(node.name) # HACK
+        nt = semantic.globals[node.name.text] # HACK
         # TODO params
         nt.rt = ResolveType.visit(node.rt, semantic)
 
@@ -164,7 +176,7 @@ class CheckRules(object):
     def visitRuleDecl(cls, node, semantic):
         old_name = semantic.scope_name
         old_locals = semantic.locals
-        semantic.scope_name = node.name
+        semantic.scope_name = node.name.text
         semantic.locals = {}
         expected = ResolveType.visit(node.rt, semantic)
         actual = cls.visit(node.body, expected, semantic)
@@ -265,24 +277,27 @@ class CheckRules(object):
 
     @dispatch(model.Get)
     def visitGet(cls, node, expected_t, semantic):
-        t = semantic.resolveSlot(node.name)
+        name = node.name.text
+        t = semantic.resolveSlot(name)
         if t is None:
-            raise Exception('Cannot resolve "%s" in %s' % (node.name, semantic.scope_name))
+            raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
         return t
 
     @dispatch(model.Set)
     def visitSet(cls, node, expected_t, semantic):
+        name = node.name.text
         t = cls.visit(node.expr, expected_t, semantic)
         if t == semantic.void:
-            raise Exception('Cannot assign void to "%s" in %s' % (node.name, semantic.scope_name))
-        semantic.setLocal(node.name, t)
+            raise Exception('Cannot assign void to "%s" in %s' % (name, semantic.scope_name))
+        semantic.setLocal(name, t)
         return t
 
     @dispatch(model.Append)
     def visitAppend(cls, node, expected_t, semantic):
-        lt = semantic.resolveSlot(node.name)
+        name = node.name.text
+        lt = semantic.resolveSlot(name)
         if lt is None:
-            raise Exception('Cannot resolve "%s" in %s' % (node.name, semantic.scope_name))
+            raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
         # TODO assert is a local
         if not isinstance(lt, model.ListType):
             raise Exception('Cannot append to %r' % (lt,))
@@ -290,6 +305,10 @@ class CheckRules(object):
         if not can_hold(lt.t, t):
             raise Exception('Cannot append %r to %r' % (t, lt))
         return t
+
+    @dispatch(model.Location)
+    def visitStringLocation(cls, node, expected_t, semantic):
+        return semantic.intrinsics['location']
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, expected_t, semantic):
@@ -318,13 +337,18 @@ class CheckUsed(object):
 
     @dispatch(model.StructDecl, model.UnionDecl, model.ExternDecl, model.RuleDecl)
     def visitDecl(cls, node, semantic):
-        if node.name not in semantic.global_refs:
-            raise Exception("Unused global: %s" % node.name)
+        name = node.name.text
+        if name not in semantic.global_refs:
+            semantic.status.error('Unused global "%s"' % name, node.name.loc)
 
 
-def process(f):
-    semantic = SemanticPass()
+def process(f, status):
+    semantic = SemanticPass(status)
     IndexGlobals.visit(f, semantic)
+    semantic.status.halt_if_errors()
     CheckSignatures.visit(f, semantic)
+    semantic.status.halt_if_errors()
     CheckRules.visit(f, semantic)
+    semantic.status.halt_if_errors()
     CheckUsed.visit(f, semantic)
+    semantic.status.halt_if_errors()

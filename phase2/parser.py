@@ -6,6 +6,10 @@ extern chars_to_string(chars:[]rune):string
 extern hex_to_int(text:string):int
 extern dec_to_int(text:string):int
 
+struct Token {
+    loc:location
+    text:string
+}
 struct Range {
     lower:rune
     upper:rune
@@ -23,6 +27,8 @@ struct Call {
 }
 struct MatchValue {
     expr:Matcher
+}
+struct Location {
 }
 struct StringLiteral {
     value:string
@@ -45,15 +51,15 @@ struct ListLiteral {
     args:[]Matcher
 }
 struct Get {
-    name:string
+    name:Token
 }
 struct Set {
     expr:Matcher
-    name:string
+    name:Token
 }
 struct Append {
     expr:Matcher
-    name:string
+    name:Token
 }
 struct Repeat {
     expr:Matcher
@@ -67,46 +73,46 @@ struct Choice {
     children:[]Matcher
 }
 struct NameRef {
-    name:string
+    name:Token
 }
 struct ListRef {
     ref:TypeRef
 }
 struct Param {
-    name:string
+    name:Token
     t:TypeRef
 }
 struct RuleDecl {
-    name:string
+    name:Token
     rt:TypeRef
     body:Matcher
     attrs:[]Attribute
 }
 struct ExternDecl {
-    name:string
+    name:Token
     params:[]Param
     rt:TypeRef
 }
 struct FieldDecl {
-    name:string
+    name:Token
     t:TypeRef
 }
 struct StructDecl {
-    name:string
+    name:Token
     fields:[]FieldDecl
 }
 struct UnionDecl {
-    name:string
+    name:Token
     refs:[]TypeRef
 }
 struct File {
     decls:[]Decl
 }
 struct Attribute {
-    name:string
+    name:Token
 }
 union TypeRef = NameRef | ListRef;
-union Matcher = Character | Slice | Call | MatchValue | StringLiteral | RuneLiteral | IntLiteral | BoolLiteral | StructLiteral | ListLiteral | Get | Set | Append | Repeat | Sequence | Choice;
+union Matcher = Character | Slice | Call | MatchValue | Location | StringLiteral | RuneLiteral | IntLiteral | BoolLiteral | StructLiteral | ListLiteral | Get | Set | Append | Repeat | Sequence | Choice;
 union Decl = RuleDecl | ExternDecl | StructDecl | UnionDecl;
 
 func S():void {
@@ -115,8 +121,8 @@ func S():void {
 func hex_digit():rune {
     /[0-9a-fA-Z]/
 }
-func ident():string {
-    </[a-zA-Z_][a-zA-Z_0-9]*/>
+func ident():Token {
+    Token{loc(), </[a-zA-Z_][a-zA-Z_0-9]*/>}
 }
 func escape_char():rune {
     /[\\]/;
@@ -169,6 +175,7 @@ func match_expr_atom():Matcher {
     | /[(] S e=match_expr S [)]/; e
     | /[<] S e=match_expr S [>]/; Slice{e}
     | MatchValue{StringLiteral{string_value()}}
+    | /"loc"/; Location{}
     | Call{Get{ident()},[]Matcher{}}
     )
 }
@@ -234,6 +241,7 @@ func expr_atom():Matcher {
     | StringLiteral{string_value()}
     | IntLiteral{int_value()}
     | BoolLiteral{bool_value()}
+    | /"loc" S "(" S ")"/; Location{}
     | Get{ident()}
     )
 }
