@@ -9,7 +9,7 @@ import semantic
 p = Parser()
 
 def rule(name, body):
-    p.rule(Rule(name, phase0.parser.text_match(body)))
+    p.rule(Rule(name, [], phase0.parser.text_match(body)))
 
 def halt():
     import pdb;pdb.set_trace()
@@ -118,8 +118,10 @@ attrs=[];
 $"]";
 attrs""")
 rule('optional_attributes', r"""attributes()|[]""")
-rule('rule_decl', r"""attrs=optional_attributes(); S(); $"func"; S(); name=ident(); S(); $"("; S(); $")"; S(); $":"; S(); rt=type_ref(); S(); $"{"; S(); body=expr(); S(); $"}";
-RuleDecl(name, rt, body, attrs)""")
+rule('rule_decl', r"""attrs=optional_attributes(); S(); $"func"; S(); name=ident(); S();
+params=param_list(); S(); $":"; S(); rt=type_ref(); S();
+$"{"; S(); body=expr(); S(); $"}";
+RuleDecl(name, params, rt, body, attrs)""")
 
 rule('field_decl', r"""name=ident(); S(); $":"; S(); FieldDecl(name, type_ref())""")
 rule('struct_decl', r"""$"struct";
@@ -137,16 +139,18 @@ S(); refs=[type_ref()];
 S(); $";";
 UnionDecl(name, refs)""")
 rule('param', r"""name=ident(); S(); $":"; S(); t=type_ref(); Param(name, t)""")
+rule('param_list', r"""$"(";
+params=[];
+(
+    S(); params<<param();
+    (S(); $","; S(); params<<param())*
+)?;
+S(); $")";
+params""")
 rule('extern_decl', r"""$"extern";
     S();
     name=ident();
-    S(); $"(";
-    params=[];
-    (
-        S(); params<<param();
-        (S(); $","; S(); params<<param())*
-    )?;
-    S(); $")"; S(); $":"; S();
+    S(); params=param_list(); S(); $":"; S();
     rt=type_ref(); ExternDecl(name, params, rt)""")
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); File(decls)""")
 

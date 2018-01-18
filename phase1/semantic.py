@@ -156,7 +156,7 @@ class CheckSignatures(object):
     @dispatch(model.RuleDecl)
     def visitRuleDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
-        # TODO params
+        nt.params = [ResolveType.visit(p.t, semantic) for p in node.params]
         nt.rt = ResolveType.visit(node.rt, semantic)
 
 
@@ -174,6 +174,7 @@ class CheckRules(object):
 
     @dispatch(model.RuleDecl)
     def visitRuleDecl(cls, node, semantic):
+        assert not node.params, node
         old_name = semantic.scope_name
         old_locals = semantic.locals
         semantic.scope_name = node.name.text

@@ -19,10 +19,10 @@ p.rule(Native('string_to_int', [Param('text')], lambda text: int(text, 0)))
 
 registerInterpreterTypes(p)
 
-p.rule(Rule('S',
+p.rule(Rule('S', [],
     Repeat(punc(' ', '\t', '\n', '\r'), 0, 0)
 ))
-p.rule(Rule('esc_char',
+p.rule(Rule('esc_char', [],
     punc('\\') & (
         punc('n') & Literal('\n')
         | punc('t') & Literal('\t')
@@ -30,22 +30,22 @@ p.rule(Rule('esc_char',
         | Slice(Character([], True))
     )
 ))
-p.rule(Rule('c',
+p.rule(Rule('c', [],
     Get('esc_char')() | Slice(Character([Range(']', ']'), Range('-', '-'), Range('^', '^')], True))
 ))
-p.rule(Rule('r',
+p.rule(Rule('r', [],
     Set(Get('c')(), 'a') & (punc('-') & Get('Range')(Get('a'), Get('c')()) | Get('Range')(Get('a'), Get('a')))
 ))
-p.rule(Rule('char',
+p.rule(Rule('char', [],
     tok('[[') & Set(Literal(False), 'inv') & Set(List([]), 'ranges') & optional(punc('^') & Set(Literal(True), 'inv')) & Repeat(Append(Get('r')(), 'ranges'), 0, 0) & tok(']]') & Get('Character')(Get('ranges'), Get('inv'))
 ))
-p.rule(Rule('string_literal',
+p.rule(Rule('string_literal', [],
     punc('"') & Set(List([]), 'chars') & Repeat(Append(Get('esc_char')() | Slice(not_punc('"')), 'chars'), 0, 0) & punc('"') & Get('Literal')(Get('chars_to_string')(Get('chars')))
 ))
-p.rule(Rule('boolean_literal',
+p.rule(Rule('boolean_literal', [],
     tok('true') & Get('Literal')(Literal(True)) | tok('false') & Get('Literal')(Literal(False))
 ))
-p.rule(Rule('int_literal',
+p.rule(Rule('int_literal', [],
     Get('Literal')(
         Get('string_to_int')(
             Slice(
@@ -56,16 +56,16 @@ p.rule(Rule('int_literal',
         )
     )
 ))
-p.rule(Rule('list_literal',
+p.rule(Rule('list_literal', [],
     punc('[') & Set(List([]), 'es') &
         (Get('S')() & Append(Get('expr')(), 'es') & Repeat(Get('S')() & punc(',') & Get('S')() & Append(Get('expr')(), 'es'), 0, 0)
         | Sequence([])
     ) & Get('S')() & punc(']') & Get('List')(Get('es'))
 ))
-p.rule(Rule('ident',
+p.rule(Rule('ident', [],
     Slice(Repeat(Character([Range('a', 'z'), Range('A', 'Z'), Range('_', '_')], False), 1, 0))
 ))
-p.rule(Rule('atom',
+p.rule(Rule('atom', [],
     punc('(') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc(')') & Get('e')
     | punc('<') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc('>') & Get('Slice')(Get('e'))
     | punc('$') & Get('S')() & Get('MatchValue')(Get('atom')())
@@ -77,7 +77,7 @@ p.rule(Rule('atom',
     | tok('loc') & Get('S')() & punc('(') & Get('S')() & punc(')') & Get('Location')()
     | Get('Get')(Get('ident')())
 ))
-p.rule(Rule('call',
+p.rule(Rule('call', [],
     Set(Get('atom')(), 'e')
     & Repeat(Set(
         punc('(')
@@ -92,7 +92,7 @@ p.rule(Rule('call',
     'e'), 0, 0)
     & Get('e')
 ))
-p.rule(Rule('repeat',
+p.rule(Rule('repeat', [],
     Set(Get('call')(), 'e')
     & ( Get('S')() &
         ( punc('*') & Get('Repeat')(Get('e'), Literal(0), Literal(0))
@@ -103,7 +103,7 @@ p.rule(Rule('repeat',
     | Get('e')
     )
 ))
-p.rule(Rule('assign',
+p.rule(Rule('assign', [],
     (Set(Get('ident')(), 'name') & Get('S')() &
         ( punc('=') & Get('S')() & Get('Set')(Get('repeat')(), Get('name'))
         | tok('<<') & Get('S')() & Get('Append')(Get('repeat')(), Get('name'))
@@ -112,7 +112,7 @@ p.rule(Rule('assign',
     )
 ))
 
-p.rule(Rule('sequence',
+p.rule(Rule('sequence', [],
     Set(Get('assign')(), 'e')
     & (
         Set(List([Get('e')]), 'es')
@@ -121,7 +121,7 @@ p.rule(Rule('sequence',
     | Get('e')
     )
 ))
-p.rule(Rule('choice',
+p.rule(Rule('choice', [],
     Set(Get('sequence')(), 'e')
     & (
         Set(List([Get('e')]), 'es')
@@ -131,7 +131,7 @@ p.rule(Rule('choice',
     )
 ))
 
-p.rule(Rule('expr',
+p.rule(Rule('expr', [],
     Get('choice')()
 ))
 

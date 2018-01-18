@@ -179,7 +179,7 @@ class ExternDecl(Decl):
 @register
 class RuleDecl(Decl):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:Token rt:TypeRef body:Matcher attrs:[]Attribute'
+    __schema__ = 'name:Token params:[]Param rt:TypeRef body:Matcher attrs:[]Attribute'
 
 
 @register

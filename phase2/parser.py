@@ -84,6 +84,7 @@ struct Param {
 }
 struct RuleDecl {
     name:Token
+    params:[]Param
     rt:TypeRef
     body:Matcher
     attrs:[]Attribute
@@ -351,8 +352,8 @@ func param_list():[]Param {
 }
 func rule_decl():RuleDecl {
     attrs=optional_attributes(); S();
-    /"func" S name=ident S "(" S ")" S ":" S rt=type_ref S "{" S body=expr S "}"/;
-    RuleDecl{name, rt, body, attrs}
+    /"func" S name=ident S params=param_list S ":" S rt=type_ref S "{" S body=expr S "}"/;
+    RuleDecl{name, params, rt, body, attrs}
 }
 func field_decl():FieldDecl {
     name=ident(); /S ":" S/; FieldDecl{name, type_ref()}

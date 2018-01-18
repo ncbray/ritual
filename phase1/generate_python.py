@@ -218,7 +218,8 @@ import interpreter
             out.write('p = interpreter.Parser()\n')
             out.write('\n')
             for decl in rules:
-                out.write('p.rule(interpreter.Rule(%r, ' % decl.name.text)
+                assert not decl.params, decl
+                out.write('p.rule(interpreter.Rule(%r, [],' % decl.name.text)
                 interp = GenerateInterpreter.visit(decl.body)
                 SerializeInterpreter.visit(interp, out)
                 out.write('))\n')

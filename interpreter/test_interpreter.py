@@ -5,15 +5,15 @@ import unittest
 class TestSimpleParser(unittest.TestCase):
     def setUp(self):
         p = Parser()
-        p.rule(Rule("t", MatchValue(Literal("true"))))
-        p.rule(Rule("f", MatchValue(Literal("fals")) & MatchValue(Literal("e"))))
-        p.rule(Rule("b", Get("t")() | Get("f")()))
-        p.rule(Rule("num", Character([Range('0', '9')], False)))
-        p.rule(Rule("not_num", Character([Range('0', '9')], True)))
-        p.rule(Rule("letter", Character([Range('a', 'z'), Range('A', 'Z')], False)))
-        p.rule(Rule("word", Repeat(Get("letter")(), 1, 0)))
-        p.rule(Rule("short_word", Repeat(Get("letter")(), 1, 3)))
-        p.rule(Rule("maybe_word", Repeat(Get("letter")(), 0, 0)))
+        p.rule(Rule("t", [], MatchValue(Literal("true"))))
+        p.rule(Rule("f", [], MatchValue(Literal("fals")) & MatchValue(Literal("e"))))
+        p.rule(Rule("b", [], Get("t")() | Get("f")()))
+        p.rule(Rule("num", [], Character([Range('0', '9')], False)))
+        p.rule(Rule("not_num", [], Character([Range('0', '9')], True)))
+        p.rule(Rule("letter", [], Character([Range('a', 'z'), Range('A', 'Z')], False)))
+        p.rule(Rule("word", [], Repeat(Get("letter")(), 1, 0)))
+        p.rule(Rule("short_word", [], Repeat(Get("letter")(), 1, 3)))
+        p.rule(Rule("maybe_word", [], Repeat(Get("letter")(), 0, 0)))
 
         self.parser = p
 
@@ -92,8 +92,8 @@ class TestSimpleParser(unittest.TestCase):
 class TestParserValues(unittest.TestCase):
     def setUp(self):
         p = Parser()
-        p.rule(Rule("num", Slice(Character([Range('0', '9')], False))))
-        p.rule(Rule("three", Set(List([]), "l") & Append(Get("num")(), "l") & Append(Get("num")(), "l") & Append(Get("num")(), "l") & Get("l")))
+        p.rule(Rule("num", [], Slice(Character([Range('0', '9')], False))))
+        p.rule(Rule("three", [], Set(List([]), "l") & Append(Get("num")(), "l") & Append(Get("num")(), "l") & Append(Get("num")(), "l") & Get("l")))
 
         self.parser = p
 
