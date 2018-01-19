@@ -23,6 +23,7 @@ p.rule(Native('halt', [], halt))
 model.registerTypes(p)
 
 rule('S', r'([[ \t\n\r]]|$"//";[[^\n]]*)*')
+rule('end_of_keyword', r'![[a-zA-Z_0-9]]')
 rule('hex_digit', r'[[0-9a-fA-F]]')
 rule('ident', r'Token(loc(), <[[a-zA-Z_]];[[a-zA-Z_0-9]]*>)')
 # TODO unicode escapes?
@@ -37,7 +38,7 @@ rule('escape_char', r"""[[\\]];
     )""")
 rule('string_value', r"""[["]];c=[];(c<<(escape_char()|[[\\]];[["]]|[[^"]]))*;[["]];chars_to_string(c)""")
 rule('int_value', r"""$"0x";hex_to_int(<hex_digit()+>) | dec_to_int(<[[0-9]]+>)""")
-rule('bool_value', r"""$"true";true|$"false";false""")
+rule('bool_value', r"""$"true";end_of_keyword();true|$"false";end_of_keyword();false""")
 
 # Character ranges
 rule('char_range_char', r"""escape_char() | [[\\]]; [[\^\-\]]] | [[^\^\-\]]]""")
@@ -50,6 +51,7 @@ rule('match_expr_atom', r"""(
     | $"("; S(); e=match_expr(); S(); $")"; e
     | $"<"; S(); e=match_expr(); S(); $">"; Slice(e)
     | MatchValue(StringLiteral(string_value()))
+    | $"!"; S(); Lookahead(match_expr_atom(), true)
     | $"loc"; Location()
     | Call(Get(ident()),[])
     )""")
@@ -76,6 +78,7 @@ rule('expr_atom', r"""(
     | $"/"; S(); e=match_expr(); S(); $"/"; e
     | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; ListLiteral(t, args)
     | $"$"; S(); MatchValue(expr_atom())
+    | $"!"; S(); Lookahead(expr_atom(), true)
     | t=name_ref(); S(); $"{"; S(); args=struct_literal_args(); S(); $"}"; StructLiteral(t, args)
     | StringLiteral(string_value())
     | IntLiteral(int_value())
@@ -120,20 +123,20 @@ attrs=[];
 $"]";
 attrs""")
 rule('optional_attributes', r"""attributes()|[]""")
-rule('rule_decl', r"""attrs=optional_attributes(); S(); $"func"; S(); name=ident(); S();
+rule('rule_decl', r"""attrs=optional_attributes(); S(); $"func"; end_of_keyword(); S(); name=ident(); S();
 params=param_list(); S(); $":"; S(); rt=type_ref(); S();
 $"{"; S(); body=expr(); S(); $"}";
 RuleDecl(name, params, rt, body, attrs)""")
 
 rule('field_decl', r"""name=ident(); S(); $":"; S(); FieldDecl(name, type_ref())""")
-rule('struct_decl', r"""$"struct";
+rule('struct_decl', r"""$"struct"; end_of_keyword();
 S(); name=ident();
 S(); $"{";
 fields=[];
 (S(); fields<<field_decl())*;
 S(); $"}";
 StructDecl(name, fields)""")
-rule('union_decl', r"""$"union";
+rule('union_decl', r"""$"union"; end_of_keyword();
 S(); name=ident();
 S(); $"=";
 S(); refs=[type_ref()];
@@ -149,12 +152,12 @@ params=[];
 )?;
 S(); $")";
 params""")
-rule('extern_decl', r"""$"extern";
+rule('extern_decl', r"""$"extern"; end_of_keyword();
     S();
     name=ident();
     S(); params=param_list(); S(); $":"; S();
     rt=type_ref(); ExternDecl(name, params, rt)""")
-rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); File(decls)""")
+rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); ![[^]]; File(decls)""")
 
 
 class CompileStatus(object):

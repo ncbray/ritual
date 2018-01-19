@@ -160,6 +160,35 @@ class MatchValue(Matcher):
 
 
 @register
+class Lookahead(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher invert:bool'
+
+    def match(self, parser):
+        # Save
+        pos = parser.pos
+        deepest = parser.deepest
+        deepest_name = parser.deepest_name
+
+        result = self.expr.match(parser)
+
+        # Restore
+        # TODO local state?
+        parser.pos = pos
+        parser.deepest = deepest
+        parser.deepest_name = deepest_name
+
+        if self.invert:
+            if parser.ok:
+                parser.fail()
+            else:
+                parser.ok = True
+            return
+        else:
+            return result
+
+
+@register
 class Slice(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'expr:Matcher'

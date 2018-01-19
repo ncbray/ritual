@@ -231,7 +231,6 @@ class TreeMeta(type):
 
         return super(TreeMeta, cls).__new__(cls, name, parents, dct)
 
-
 @classmethod
 def visit(cls, *args):
     f = cls.__dispatchers__.get(type(args[0]))
@@ -249,7 +248,7 @@ def dispatch(*types):
 
 
 class TypeDispatcher(type):
-    def __new__(cls, name, parents, dct):
+    def __new__(cls, cls_name, parents, dct):
         d = {}
         remove = []
         for name, f in dct.iteritems():
@@ -263,4 +262,4 @@ class TypeDispatcher(type):
         dct['__dispatchers__'] = d
         dct['visit'] = visit
 
-        return super(TypeDispatcher, cls).__new__(cls, name, parents, dct)
+        return super(TypeDispatcher, cls).__new__(cls, cls_name, parents, dct)

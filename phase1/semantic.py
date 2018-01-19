@@ -196,7 +196,7 @@ class CheckRules(object):
             semantic.setLocal(p.name.text, t, p.name.loc)
 
         actual = cls.visit(node.body, expected, semantic)
-        if not can_hold(expected, actual):
+        if expected is not semantic.void and not can_hold(expected, actual):
             raise Exception('Expected return type of %r, got %r instead in %s.' % (expected, actual, semantic.scope_name))
 
         for name, loc in semantic.local_locs:
@@ -253,6 +253,14 @@ class CheckRules(object):
     def visitSlice(cls, node, expected_t, semantic):
         cls.visit(node.expr, semantic.void, semantic)
         return semantic.intrinsics['string']
+
+    @dispatch(model.Lookahead)
+    def visitLookahead(cls, node, expected_t, semantic):
+        t = cls.visit(node.expr, semantic.void, semantic)
+        if node.invert:
+            return semantic.void
+        else:
+            return t
 
     @dispatch(model.Call)
     def visitCall(cls, node, expected_t, semantic):

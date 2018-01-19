@@ -2,6 +2,13 @@ import unittest
 from interpreter import ParseFailed
 from parser import *
 
+
+def simpleCompile(text):
+    d = {}
+    compile('test', text, d)
+    return d['buildParser']()
+
+
 class TestParser(unittest.TestCase):
     def test_ident(self):
         for ident in ["FooBar", "foo_bar", "_", 'f123']:
@@ -70,8 +77,7 @@ class TestParser(unittest.TestCase):
         #print m
 
     def test_func_params(self):
-        d = {}
-        compile('test_func_params', r"""
+        p = simpleCompile(r"""
 [export]
 func bracket(s:string):string {
     <$"["; $s; $"]">
@@ -80,10 +86,25 @@ func bracket(s:string):string {
 func wrap():string {
   bracket("wrap")
 }
-""", d)
-        p = d['buildParser']()
+""")
         p.parse('bracket', ['foo'], '[foo]')
         with self.assertRaises(ParseFailed):
             p.parse('bracket', ['bar'], '[foo]')
         p.parse('bracket', ['\0'], '[\0]')
         p.parse('wrap', [], '[wrap]')
+
+    def test_lookahead(self):
+        p = simpleCompile(r"""
+[export]
+func keyword(s:string):void {
+    $s; !/[a-zA-Z_0-9]/
+}
+[export]
+func main(s:string):string {
+  keyword(s); /[ ]* <[^]*>/
+}
+""")
+        self.assertEqual(p.parse('main', ['foo'], 'foo bar'), 'bar')
+        with self.assertRaises(ParseFailed):
+            self.assertEqual(p.parse('main', ['foo'], 'foobar'), 'bar')
+        self.assertEqual(p.parse('main', ['foo'], 'foo{}'), '{}')

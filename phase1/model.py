@@ -67,6 +67,12 @@ class Slice(Matcher):
 
 
 @register
+class Lookahead(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher invert:bool'
+
+
+@register
 class Get(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:Token'

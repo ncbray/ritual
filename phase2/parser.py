@@ -28,6 +28,10 @@ struct Call {
 struct MatchValue {
     expr:Matcher
 }
+struct Lookahead {
+    expr:Matcher
+    invert:bool
+}
 struct Location {
 }
 struct StringLiteral {
@@ -113,11 +117,17 @@ struct Attribute {
     name:Token
 }
 union TypeRef = NameRef | ListRef;
-union Matcher = Character | Slice | Call | MatchValue | Location | StringLiteral | RuneLiteral | IntLiteral | BoolLiteral | StructLiteral | ListLiteral | Get | Set | Append | Repeat | Sequence | Choice;
+union Matcher =
+    Character | Slice | Call | MatchValue | Lookahead | Location | StringLiteral
+    | RuneLiteral | IntLiteral | BoolLiteral | StructLiteral | ListLiteral | Get
+    | Set | Append | Repeat | Sequence | Choice;
 union Decl = RuleDecl | ExternDecl | StructDecl | UnionDecl;
 
 func S():void {
     /([ \t\n\r]|"//"[^\n]*)*/
+}
+func end_of_keyword():void {
+    /![a-zA-Z_0-9]/
 }
 func hex_digit():rune {
     /[0-9a-fA-Z]/
@@ -151,8 +161,8 @@ func int_value():int {
     )
 }
 func bool_value():bool {
-    ( /"true"/; true
-    | /"false"/; false
+    ( /"true" end_of_keyword/; true
+    | /"false" end_of_keyword/; false
     )
 }
 func char_range_char():rune {
@@ -177,6 +187,7 @@ func match_expr_atom():Matcher {
     | /[(] S e=match_expr S [)]/; e
     | /[<] S e=match_expr S [>]/; Slice{e}
     | MatchValue{StringLiteral{string_value()}}
+    | /"!" S/; Lookahead{match_expr_atom(), true}
     | /"loc"/; Location{}
     | Call{Get{ident()},[]Matcher{}}
     )
@@ -240,6 +251,7 @@ func expr_atom():Matcher {
     | /"/" S e=match_expr S "/"/; e
     | /"[]" S t=type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; ListLiteral{t, args}
     | /"$" S/; MatchValue{expr_atom()}
+    | /"!" S/; Lookahead{expr_atom(), true}
     | struct_literal()
     | StringLiteral{string_value()}
     | IntLiteral{int_value()}
@@ -354,28 +366,28 @@ func param_list():[]Param {
 }
 func rule_decl():RuleDecl {
     attrs=optional_attributes(); S();
-    /"func" S name=ident S params=param_list S ":" S rt=type_ref S "{" S body=expr S "}"/;
+    /"func" end_of_keyword S name=ident S params=param_list S ":" S rt=type_ref S "{" S body=expr S "}"/;
     RuleDecl{name, params, rt, body, attrs}
 }
 func field_decl():FieldDecl {
     name=ident(); /S ":" S/; FieldDecl{name, type_ref()}
 }
 func struct_decl():StructDecl {
-    /"struct" S name=ident S "{"/;
+    /"struct" end_of_keyword S name=ident S "{"/;
     fields = []FieldDecl{};
     (S(); fields<<field_decl())*;
     /S "}"/;
     StructDecl{name, fields}
 }
 func union_decl():UnionDecl {
-    /"union" S name=ident S "=" S/;
+    /"union" end_of_keyword S name=ident S "=" S/;
     refs = []TypeRef{type_ref()};
     (/S "|" S/; refs<<type_ref())*;
     /S ";"/;
     UnionDecl{name, refs}
 }
 func extern_decl():ExternDecl {
-    /"extern" S name=ident S params=param_list S ":" S rt=type_ref/;
+    /"extern" end_of_keyword S name=ident S params=param_list S ":" S rt=type_ref/;
     ExternDecl{name, params, rt}
 }
 func decl():Decl {
@@ -386,6 +398,7 @@ func file():File {
     decls = []Decl{};
     (S(); decls<<decl())*;
     S();
+    /![^]/;
     File{decls}
 }
 """

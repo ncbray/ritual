@@ -109,7 +109,8 @@ class GenerateInterpreter(object):
     @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
         model.Range, model.MatchValue, model.ListLiteral, model.Slice,
         model.Call, model.Get, model.Set, model.Append, model.StringLiteral,
-        model.RuneLiteral, model.IntLiteral, model.BoolLiteral, model.Location)
+        model.RuneLiteral, model.IntLiteral, model.BoolLiteral, model.Location,
+        model.Lookahead)
     def visitNode(cls, node):
         # Assume named fields can be mapped to each other.
         n = type(node).__name__
@@ -141,8 +142,8 @@ class SerializeInterpreter(object):
     @dispatch(interpreter.Choice, interpreter.Sequence, interpreter.Repeat,
         interpreter.Character, interpreter.Range,
         interpreter.MatchValue, interpreter.List, interpreter.Slice,
-        interpreter.Call, interpreter.Get, interpreter.Set,interpreter.Append,
-        interpreter.Literal, interpreter.Location)
+        interpreter.Call, interpreter.Get, interpreter.Set, interpreter.Append,
+        interpreter.Literal, interpreter.Location, interpreter.Lookahead)
     def visitNode(cls, node, out):
         out.write('interpreter.%s(' % type(node).__name__)
         dirty = False

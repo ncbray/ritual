@@ -69,6 +69,7 @@ p.rule(Rule('atom', [],
     punc('(') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc(')') & Get('e')
     | punc('<') & Get('S')() & Set(Get('expr')(), 'e') & Get('S')() & punc('>') & Get('Slice')(Get('e'))
     | punc('$') & Get('S')() & Get('MatchValue')(Get('atom')())
+    | punc('!') & Get('S')() & Get('Lookahead')(Get('atom')(), Literal(True))
     | Get('char')()
     | Get('list_literal')()
     | Get('string_literal')()
