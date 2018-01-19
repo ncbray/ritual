@@ -242,11 +242,15 @@ def dispatch(*types):
 class TypeDispatcher(type):
     def __new__(cls, name, parents, dct):
         d = {}
-        for f in dct.itervalues():
+        remove = []
+        for name, f in dct.iteritems():
             if not hasattr(f, '__dispatch__'):
                 continue
             for t in f.__dispatch__:
                 d[t] = f
+            remove.append(name)
+        for name in remove:
+            del dct[name]
         dct['__dispatchers__'] = d
         dct['visit'] = visit
 
