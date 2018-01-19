@@ -29,10 +29,14 @@ class LocalSlot(object):
 class SemanticPass(object):
     def __init__(self, status):
         self.status = status
-        self.scope_name = 'global'
+
         self.globals = {}
         self.global_refs = set()
+
+        self.scope_name = 'global'
         self.locals = {}
+        self.local_locs = []
+        self.local_refs = set()
 
         self.void = model.VoidType()
         self.intrinsics = {}
@@ -43,12 +47,15 @@ class SemanticPass(object):
         assert isinstance(name, basestring), name
         self.global_refs.add(name)
 
-    def resolveSlot(self, name):
+    def resolveSlot(self, name, is_use):
         assert isinstance(name, basestring), name
         if name in self.locals:
+            if is_use:
+                self.local_refs.add(name)
             return self.locals[name]
         if name in self.globals:
-            self.globalIsUsed(name)
+            if is_use:
+                self.globalIsUsed(name)
             return self.globals[name]
 
     def declareGlobal(self, name, t, loc):
@@ -60,7 +67,7 @@ class SemanticPass(object):
             assert isinstance(t, model.Type), t
             self.globals[name] = t
 
-    def setLocal(self, name, t):
+    def setLocal(self, name, t, loc):
         assert isinstance(name, basestring), name
         assert isinstance(t, model.Type), t
         assert not isinstance(t, model.VoidType), (self.scope_name, name)
@@ -73,6 +80,7 @@ class SemanticPass(object):
                     raise Exception('Attempted to redefine "%s" (%r vs. %r)' % (name, current, t))
         else:
             self.locals[name] = t
+            self.local_locs.append((name, loc))
 
 
 class IndexGlobals(object):
@@ -179,10 +187,17 @@ class CheckRules(object):
         old_locals = semantic.locals
         semantic.scope_name = node.name.text
         semantic.locals = {}
+        semantic.local_locs = []
+        semantic.local_refs = set()
         expected = ResolveType.visit(node.rt, semantic)
         actual = cls.visit(node.body, expected, semantic)
         if not can_hold(expected, actual):
             raise Exception('Expected return type of %r, got %r instead in %s.' % (expected, actual, semantic.scope_name))
+
+        for name, loc in semantic.local_locs:
+            if name not in semantic.local_refs:
+                semantic.status.error('Unused local "%s"' % name, loc)
+
         semantic.locals = old_locals
         semantic.scope_name = old_name
 
@@ -279,7 +294,7 @@ class CheckRules(object):
     @dispatch(model.Get)
     def visitGet(cls, node, expected_t, semantic):
         name = node.name.text
-        t = semantic.resolveSlot(name)
+        t = semantic.resolveSlot(name, True)
         if t is None:
             raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
         return t
@@ -290,13 +305,13 @@ class CheckRules(object):
         t = cls.visit(node.expr, expected_t, semantic)
         if t == semantic.void:
             raise Exception('Cannot assign void to "%s" in %s' % (name, semantic.scope_name))
-        semantic.setLocal(name, t)
+        semantic.setLocal(name, t, node.name.loc)
         return t
 
     @dispatch(model.Append)
     def visitAppend(cls, node, expected_t, semantic):
         name = node.name.text
-        lt = semantic.resolveSlot(name)
+        lt = semantic.resolveSlot(name, False)
         if lt is None:
             raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
         # TODO assert is a local
