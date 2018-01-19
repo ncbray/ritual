@@ -17,76 +17,79 @@ class TestSimpleParser(unittest.TestCase):
 
         self.parser = p
 
+    def p(self, name, text):
+        return self.parser.parse(name, [], text)
+
     def test_t_match(self):
-        self.parser.parse("t", "true")
+        self.p("t", "true")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("t", "true ")
+            self.p("t", "true ")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("t", "false")
+            self.p("t", "false")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("t", "")
+            self.p("t", "")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("t", "tru")
+            self.p("t", "tru")
 
     def test_b(self):
-        self.parser.parse("b", "true")
-        self.parser.parse("b", "false")
+        self.p("b", "true")
+        self.p("b", "false")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("b", "maybe")
+            self.p("b", "maybe")
 
     def test_num(self):
-        self.parser.parse("num", "0")
-        self.parser.parse("num", "5")
-        self.parser.parse("num", "9")
+        self.p("num", "0")
+        self.p("num", "5")
+        self.p("num", "9")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("num", "")
+            self.p("num", "")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("num", "d")
+            self.p("num", "d")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("num", "!")
+            self.p("num", "!")
 
     def test_not_num(self):
-        self.parser.parse("not_num", "d")
-        self.parser.parse("not_num", "!")
+        self.p("not_num", "d")
+        self.p("not_num", "!")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("not_num", "")
+            self.p("not_num", "")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("not_num", "0")
+            self.p("not_num", "0")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("not_num", "5")
+            self.p("not_num", "5")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("not_num", "9")
+            self.p("not_num", "9")
 
     def test_letter(self):
-        self.parser.parse("letter", "a")
-        self.parser.parse("letter", "g")
-        self.parser.parse("letter", "z")
-        self.parser.parse("letter", "A")
-        self.parser.parse("letter", "G")
-        self.parser.parse("letter", "Z")
+        self.p("letter", "a")
+        self.p("letter", "g")
+        self.p("letter", "z")
+        self.p("letter", "A")
+        self.p("letter", "G")
+        self.p("letter", "Z")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("letter", "")
+            self.p("letter", "")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("letter", "7")
+            self.p("letter", "7")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("letter", "!")
+            self.p("letter", "!")
 
     def test_word(self):
         with self.assertRaises(ParseFailed):
-            self.parser.parse("word", "")
-        self.parser.parse("word", "a")
-        self.parser.parse("word", "cat")
-        self.parser.parse("word", "aardvark")
+            self.p("word", "")
+        self.p("word", "a")
+        self.p("word", "cat")
+        self.p("word", "aardvark")
 
         with self.assertRaises(ParseFailed):
-            self.parser.parse("short_word", "")
-        self.parser.parse("short_word", "a")
-        self.parser.parse("short_word", "cat")
+            self.p("short_word", "")
+        self.p("short_word", "a")
+        self.p("short_word", "cat")
         with self.assertRaises(ParseFailed):
-            self.parser.parse("short_word", "aardvark")
+            self.p("short_word", "aardvark")
 
-        self.parser.parse("maybe_word", "")
-        self.parser.parse("maybe_word", "aardvark")
+        self.p("maybe_word", "")
+        self.p("maybe_word", "aardvark")
 
 
 class TestParserValues(unittest.TestCase):
@@ -98,6 +101,6 @@ class TestParserValues(unittest.TestCase):
         self.parser = p
 
     def test_three(self):
-        self.assertEqual(["1", "2", "3"], self.parser.parse("three", "123"))
+        self.assertEqual(["1", "2", "3"], self.parser.parse("three", [], "123"))
         with self.assertRaises(ParseFailed):
-            self.parser.parse("three", "12b")
+            self.parser.parse("three", [], "12b")

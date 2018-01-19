@@ -5,10 +5,10 @@ from parser import *
 class TestParser(unittest.TestCase):
     def test_ident(self):
         for ident in ["FooBar", "foo_bar", "_", 'f123']:
-            self.assertEqual(p.parse("ident", ident).text, ident)
+            self.assertEqual(p.parse("ident", [], ident).text, ident)
         for ident in ['123', '', '$']:
             with self.assertRaises(ParseFailed):
-                p.parse('ident', ident)
+                p.parse('ident', [], ident)
 
     def test_escape_char(self):
         cases = [
@@ -21,7 +21,7 @@ class TestParser(unittest.TestCase):
             (r'\u{2014}', u'\u2014'),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("escape_char", text), result)
+            self.assertEqual(p.parse("escape_char", [], text), result)
 
     def test_string(self):
         cases = [
@@ -31,7 +31,7 @@ class TestParser(unittest.TestCase):
             (r'"\n"', '\n'),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("string_value", text), result)
+            self.assertEqual(p.parse("string_value", [], text), result)
 
     def test_int(self):
         cases = [
@@ -41,7 +41,7 @@ class TestParser(unittest.TestCase):
             (r'0xff', 0xff),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("int_value", text), result)
+            self.assertEqual(p.parse("int_value", [], text), result)
 
     def test_char_match(self):
         cases = [
@@ -53,18 +53,37 @@ class TestParser(unittest.TestCase):
             (r'[^\n]', True, 1),
         ]
         for text, inv, num in cases:
-            m = p.parse("char_match", text)
+            m = p.parse("char_match", [], text)
             self.assertEqual(m.invert, inv)
             self.assertEqual(len(m.ranges), num)
 
     def test_match_expr(self):
-        m = p.parse("match_expr", r'result=<("foo"|"bar"|other)+>')
+        m = p.parse("match_expr", [], r'result=<("foo"|"bar"|other)+>')
         #print m
 
     def test_expr(self):
-        m = p.parse("expr", r'a(); b(x) | c(x, x); d(x , x , x)')
+        m = p.parse("expr", [], r'a(); b(x) | c(x, x); d(x , x , x)')
         #print m
 
     def test_rule(self):
-        m = p.parse("rule_decl", r'func foo():string {/"foo"/}')
+        m = p.parse("rule_decl", [], r'func foo():string {/"foo"/}')
         #print m
+
+    def test_func_params(self):
+        d = {}
+        compile('test_func_params', r"""
+[export]
+func bracket(s:string):string {
+    <$"["; $s; $"]">
+}
+[export]
+func wrap():string {
+  bracket("wrap")
+}
+""", d)
+        p = d['buildParser']()
+        p.parse('bracket', ['foo'], '[foo]')
+        with self.assertRaises(ParseFailed):
+            p.parse('bracket', ['bar'], '[foo]')
+        p.parse('bracket', ['\0'], '[\0]')
+        p.parse('wrap', [], '[wrap]')

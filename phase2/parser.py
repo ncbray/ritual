@@ -239,6 +239,7 @@ func expr_atom():Matcher {
     | /"<" S e=expr S ">"/; Slice{e}
     | /"/" S e=match_expr S "/"/; e
     | /"[]" S t=type_ref S "{"/; args = []Matcher{}; (S(); args << expr(); (/S "," S/; args << expr())*)?; /S "}"/; ListLiteral{t, args}
+    | /"$" S/; MatchValue{expr_atom()}
     | struct_literal()
     | StringLiteral{string_value()}
     | IntLiteral{int_value()}
@@ -397,7 +398,6 @@ def setup(src):
         hex_to_int=lambda text: int(text, 16),
         dec_to_int=lambda text: int(text, 10),
     )
-    p.parse('file', src)
     return p
 
 p = setup(src)

@@ -273,9 +273,14 @@ class Rule(Callable):
     def call(self, parser, args):
         if len(args) != len(self.params):
             parser.internalError(self, 'Expected %d arguments for %s, got %d' % (len(self.params), self.name, len(args)))
-        assert not args, args
 
         parser.enterFrame(self.name)
+
+        # Bind arguments to parameters.
+        lcls = parser.stack[-1].scope
+        for i in range(len(self.params)):
+            lcls[self.params[i].name] = args[i]
+
         result = self.body.match(parser)
         parser.exitFrame()
         return result
@@ -359,14 +364,14 @@ class Parser(object):
         info = location.extractLocationInfo(self.stream, self.deepest)
         return '%d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.deepest_name, info.text, info.arrow)
 
-    def parse(self, name, text):
+    def parse(self, name, args, text):
         self.stream = text
         self.pos = 0
         self.deepest = 0
         self.deepest_name = '<EOS>'
         self.ok = True
         self.stack = []
-        result = self.rules[name].call(self, [])
+        result = self.rules[name].call(self, args)
         if self.hasNext():
             self.fail()
         if not self.ok:

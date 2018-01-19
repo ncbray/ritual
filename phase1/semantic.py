@@ -182,7 +182,8 @@ class CheckRules(object):
 
     @dispatch(model.RuleDecl)
     def visitRuleDecl(cls, node, semantic):
-        assert not node.params, node
+        nt = semantic.globals[node.name.text] # HACK
+
         old_name = semantic.scope_name
         old_locals = semantic.locals
         semantic.scope_name = node.name.text
@@ -190,6 +191,10 @@ class CheckRules(object):
         semantic.local_locs = []
         semantic.local_refs = set()
         expected = ResolveType.visit(node.rt, semantic)
+
+        for p, t in zip(node.params, nt.params):
+            semantic.setLocal(p.name.text, t, p.name.loc)
+
         actual = cls.visit(node.body, expected, semantic)
         if not can_hold(expected, actual):
             raise Exception('Expected return type of %r, got %r instead in %s.' % (expected, actual, semantic.scope_name))

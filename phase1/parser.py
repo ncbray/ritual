@@ -75,6 +75,7 @@ rule('expr_atom', r"""(
     | $"<"; S(); e=expr(); S(); $">"; Slice(e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
     | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; ListLiteral(t, args)
+    | $"$"; S(); MatchValue(expr_atom())
     | t=name_ref(); S(); $"{"; S(); args=struct_literal_args(); S(); $"}"; StructLiteral(t, args)
     | StringLiteral(string_value())
     | IntLiteral(int_value())
@@ -175,7 +176,7 @@ class CompileStatus(object):
 
 def compile(name, text, out_dict):
     status = CompileStatus(text)
-    f = p.parse('file', text)
+    f = p.parse('file', [], text)
     semantic.process(f, status)
     src = generate_python.generate_source(f)
     generate_python.compile_source(name, src, out_dict)

@@ -137,4 +137,4 @@ p.rule(Rule('expr', [],
 
 
 def text_match(text):
-    return p.parse('expr', text)
+    return p.parse('expr', [], text)

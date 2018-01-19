@@ -5,7 +5,7 @@ import parser
 
 class TestParser(unittest.TestCase):
     def test_self_hosting(self):
-        parser.p.parse('file', parser.src)
+        parser.p.parse('file', [], parser.src)
 
     def test_escape_char(self):
         cases = [
@@ -18,4 +18,11 @@ class TestParser(unittest.TestCase):
             (r'\u{2014}', u'\u2014'),
         ]
         for text, result in cases:
-            self.assertEqual(parser.p.parse("escape_char", text), result)
+            self.assertEqual(parser.p.parse("escape_char", [], text), result)
+
+    def test_args(self):
+        parser.p.parse("file", [], r"""
+func bracket(s:string):string {
+    <$"["; $s; $"]">
+}
+""")
