@@ -2,6 +2,7 @@ import inspect
 import re
 
 ident = re.compile(r'\w+')
+dotted_name = re.compile(r'\w+(?:\.\w+)*')
 ws = re.compile(r'\s*')
 
 
@@ -11,6 +12,11 @@ class NamedType(object):
 
 
 class ListType(object):
+    def __init__(self, t):
+        self.t = t
+
+
+class NullableType(object):
     def __init__(self, t):
         self.t = t
 
@@ -58,8 +64,17 @@ class SchemaParser(object):
         else:
             return None
 
+    def dotted_name(self):
+        m = dotted_name.match(self.schema, self.pos)
+        if m:
+            assert m.end() != self.pos
+            self.pos = m.end()
+            return m.group()
+        else:
+            return None
+
     def type_ref(self):
-        name = self.ident()
+        name = self.dotted_name()
         if name is not None:
             return NamedType(name)
         elif self.check_exact('[]'):
@@ -68,6 +83,12 @@ class SchemaParser(object):
             if t is None:
                 self.error('Missing type ref')
             return ListType(t)
+        elif self.check_exact('?'):
+            self.consume_exact('?')
+            t = self.type_ref()
+            if t is None:
+                self.error('Missing type ref')
+            return NullableType(t)
         elif self.check_exact('*'):
             self.consume_exact('*')
             return AnyType()
@@ -149,6 +170,8 @@ def zero_value(t):
             return None
     elif isinstance(t, ListType):
         return []
+    elif isinstance(t, NullableType):
+        return None
     else:
         assert False, t
 
@@ -165,6 +188,17 @@ def gen_validation(fn, ft, indent):
         ft = python_types.get(ft.name, ft.name)
         #src += indent + 'print %r, %s\n' % (ft, ft)
         src += indent + 'assert isinstance(%s, %s), (type(self), type(%s))\n' % (fn, ft, fn)
+    elif isinstance(ft, NullableType):
+        src += indent + 'if %s is not None:\n' % (fn,)
+        child_indent = indent + '  '
+        child_src = gen_validation(fn, ft.t, child_indent)
+        if not child_src:
+            child_src = child_indent + 'pass'
+        src += child_src
+    elif isinstance(ft, AnyType):
+        pass
+    else:
+        assert False, ft
     return src
 
 

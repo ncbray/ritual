@@ -138,4 +138,6 @@ p.rule(Rule('expr', [],
 
 
 def text_match(text):
-    return p.parse('expr', [], text)
+    result = p.parse('expr', [], text)
+    assert result.ok, result
+    return result.value

@@ -334,8 +334,15 @@ def registerInterpreterTypes(p):
         p.rule(Native(t.__name__, [Param(slot) for slot in t.__slots__], t))
 
 
-class ParseFailed(Exception):
-    pass
+@register
+class ParseResult(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'value:* pos:int ok:bool error_scope:?string error_location:?location.LocationInfo'
+
+    def error_message(self):
+        assert not self.ok
+        info = self.error_location
+        return 'Error at %d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.error_scope, info.text, info.arrow)
 
 
 class StackFrame(object):
@@ -393,7 +400,9 @@ class Parser(object):
         info = location.extractLocationInfo(self.stream, self.deepest)
         return '%d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.deepest_name, info.text, info.arrow)
 
-    def parse(self, name, args, text):
+    def parse(self, name, args, text, must_consume_everything=False):
+        assert isinstance(name, basestring), type(name)
+        assert isinstance(text, basestring), type(text)
         self.stream = text
         self.pos = 0
         self.deepest = 0
@@ -401,8 +410,14 @@ class Parser(object):
         self.ok = True
         self.stack = []
         result = self.rules[name].call(self, args)
-        if self.hasNext():
+        if self.hasNext() and must_consume_everything:
             self.fail()
+        pos = self.pos
+        error_scope = None
+        info = None
         if not self.ok:
-            raise ParseFailed("Error at %s" % (self.extractErrorLine()))
-        return result
+            result = None
+            pos = 0
+            error_scope = self.deepest_name
+            info = location.extractLocationInfo(self.stream, self.deepest)
+        return ParseResult(result, pos, self.ok, error_scope, info)

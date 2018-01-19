@@ -1,21 +1,24 @@
 import unittest
-from interpreter import ParseFailed
-from parser import *
+import interpreter.testutil
+import model
+import parser
 
 
 def simpleCompile(text):
     d = {}
-    compile('test', text, d)
+    parser.compile('test', text, d)
     return d['buildParser']()
 
 
-class TestParser(unittest.TestCase):
+class TestParser(interpreter.testutil.ParserTestCase):
+    def setUp(self):
+        self.parser = parser.p
+
     def test_ident(self):
-        for ident in ["FooBar", "foo_bar", "_", 'f123']:
-            self.assertEqual(p.parse("ident", [], ident).text, ident)
+        for ident in ['FooBar', 'foo_bar', '_', 'f123']:
+            self.p_ok('ident', ident, model.Token(0, ident))
         for ident in ['123', '', '$']:
-            with self.assertRaises(ParseFailed):
-                p.parse('ident', [], ident)
+            self.p_fail('ident', ident)
 
     def test_escape_char(self):
         cases = [
@@ -28,7 +31,7 @@ class TestParser(unittest.TestCase):
             (r'\u{2014}', u'\u2014'),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("escape_char", [], text), result)
+            self.p_ok('escape_char', text, result)
 
     def test_string(self):
         cases = [
@@ -38,7 +41,7 @@ class TestParser(unittest.TestCase):
             (r'"\n"', '\n'),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("string_value", [], text), result)
+            self.p_ok('string_value', text, result)
 
     def test_int(self):
         cases = [
@@ -48,7 +51,7 @@ class TestParser(unittest.TestCase):
             (r'0xff', 0xff),
         ]
         for text, result in cases:
-            self.assertEqual(p.parse("int_value", [], text), result)
+            self.p_ok('int_value', text, result)
 
     def test_char_match(self):
         cases = [
@@ -60,24 +63,24 @@ class TestParser(unittest.TestCase):
             (r'[^\n]', True, 1),
         ]
         for text, inv, num in cases:
-            m = p.parse("char_match", [], text)
+            m = self.p_ok('char_match', text)
             self.assertEqual(m.invert, inv)
             self.assertEqual(len(m.ranges), num)
 
     def test_match_expr(self):
-        m = p.parse("match_expr", [], r'result=<("foo"|"bar"|other)+>')
-        #print m
+        self.p_ok('match_expr', r'result=<("foo"|"bar"|other)+>')
 
     def test_expr(self):
-        m = p.parse("expr", [], r'a(); b(x) | c(x, x); d(x , x , x)')
-        #print m
+        self.p_ok('expr', r'a(); b(x) | c(x, x); d(x , x , x)')
 
     def test_rule(self):
-        m = p.parse("rule_decl", [], r'func foo():string {/"foo"/}')
-        #print m
+        self.p_ok('rule_decl', r'func foo():string {/"foo"/}')
+
+
+class TestAlternateParsers(interpreter.testutil.ParserTestCase):
 
     def test_func_params(self):
-        p = simpleCompile(r"""
+        self.parser = simpleCompile(r"""
 [export]
 func bracket(s:string):string {
     <$"["; $s; $"]">
@@ -87,14 +90,13 @@ func wrap():string {
   bracket("wrap")
 }
 """)
-        p.parse('bracket', ['foo'], '[foo]')
-        with self.assertRaises(ParseFailed):
-            p.parse('bracket', ['bar'], '[foo]')
-        p.parse('bracket', ['\0'], '[\0]')
-        p.parse('wrap', [], '[wrap]')
+        self.p_ok('bracket', '[foo]', args=['foo'])
+        self.p_fail('bracket', '[foo]', args=['bar'])
+        self.p_ok('bracket', '[\0]', args=['\0'])
+        self.p_ok('wrap', '[wrap]')
 
     def test_lookahead(self):
-        p = simpleCompile(r"""
+        self.parser = simpleCompile(r"""
 [export]
 func keyword(s:string):void {
     $s; !/[a-zA-Z_0-9]/
@@ -104,7 +106,7 @@ func main(s:string):string {
   keyword(s); /[ ]* <[^]*>/
 }
 """)
-        self.assertEqual(p.parse('main', ['foo'], 'foo bar'), 'bar')
-        with self.assertRaises(ParseFailed):
-            self.assertEqual(p.parse('main', ['foo'], 'foobar'), 'bar')
-        self.assertEqual(p.parse('main', ['foo'], 'foo{}'), '{}')
+
+        self.p_ok('main', 'foo bar', args=['foo'], value='bar')
+        self.p_fail('main', 'foobar', args=['foo'])
+        self.p_ok('main', 'foo{}', args=['foo'], value='{}')

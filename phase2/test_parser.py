@@ -1,11 +1,16 @@
 import unittest
 
+import interpreter.testutil
 import parser
 
 
-class TestParser(unittest.TestCase):
+class TestParser(interpreter.testutil.ParserTestCase):
+
+    def setUp(self):
+        self.parser = parser.p
+
     def test_self_hosting(self):
-        parser.p.parse('file', [], parser.src)
+        self.p_ok('file', parser.src)
 
     def test_escape_char(self):
         cases = [
@@ -18,10 +23,10 @@ class TestParser(unittest.TestCase):
             (r'\u{2014}', u'\u2014'),
         ]
         for text, result in cases:
-            self.assertEqual(parser.p.parse("escape_char", [], text), result)
+            self.p_ok('escape_char', text, result)
 
     def test_args(self):
-        parser.p.parse("file", [], r"""
+        self.p_ok("file", r"""
 func bracket(s:string):string {
     <$"["; $s; $"]">
 }
