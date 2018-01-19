@@ -198,6 +198,15 @@ class TreeMeta(type):
             else:
                 src += '  pass\n'
 
+        if '__eq__' not in dct:
+            src += '\ndef __eq__(self, other):\n'
+            parts = ['type(self) is type(other)']
+            for f in fields:
+                if 'no_compare' not in f.attrs:
+                    parts.append('self.%s == other.%s' % (f.name, f.name))
+            src += '  return self is other or %s\n' % ' and '.join(parts)
+
+
         if '__repr__' not in dct:
             args = ['type(self).__name__']
             pat = []
