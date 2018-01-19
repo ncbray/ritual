@@ -18,6 +18,7 @@ class TestParser(unittest.TestCase):
             (r'\0', '\0'),
             (r'\x00', '\0'),
             (r'\\', '\\'),
+            (r'\u{2014}', u'\u2014'),
         ]
         for text, result in cases:
             self.assertEqual(p.parse("escape_char", text), result)

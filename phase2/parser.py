@@ -133,6 +133,7 @@ func escape_char():rune {
     | /[0]/; chr(0x00)
     | /[\\]/; chr(0x5C)
     | /[x]/; chr(hex_to_int(</hex_digit hex_digit/>))
+    | /[u][{] digits=<hex_digit+> [}]/; chr(hex_to_int(digits))
     )
 }
 func string_value():string {

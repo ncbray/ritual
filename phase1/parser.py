@@ -33,6 +33,7 @@ rule('escape_char', r"""[[\\]];
     | [[0]]; chr(0x00)
     | [[\\]]; chr(0x5C)
     | [[x]]; chr(hex_to_int(<hex_digit(); hex_digit()>))
+    | [[u]]; [[{]]; c=chr(hex_to_int(<hex_digit()+>)); [[}]]; c
     )""")
 rule('string_value', r"""[["]];c=[];(c<<(escape_char()|[[\\]];[["]]|[[^"]]))*;[["]];chars_to_string(c)""")
 rule('int_value', r"""$"0x";hex_to_int(<hex_digit()+>) | dec_to_int(<[[0-9]]+>)""")
