@@ -180,7 +180,7 @@ class CompileStatus(object):
 def compile(name, text, out_dict):
     status = CompileStatus(text)
     result = p.parse('file', [], text)
-    assert result.ok
+    assert result.ok, result.error_message()
     f = result.value
     semantic.process(f, status)
     src = generate_python.generate_source(f)

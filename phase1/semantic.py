@@ -371,6 +371,54 @@ class CheckUsed(object):
             semantic.status.error('Unused global "%s"' % name, node.name.loc)
 
 
+class Simplify(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(list)
+    def visitList(cls, node):
+        for child in node:
+            cls.visit(child)
+
+    @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.Get,
+        model.Character, bool, str, unicode, int, model.Attribute,
+        model.StringLiteral, model.BoolLiteral, model.IntLiteral,
+        model.RuneLiteral, model.Location)
+    def visitLeaf(cls, node):
+        pass
+
+    @dispatch(model.Sequence)
+    def visitSequence(cls, node):
+        out = []
+        for child in node.children:
+            cls.visit(child)
+            if isinstance(child, model.Sequence):
+                out.extend(child.children)
+            else:
+                out.append(child)
+        assert len(out) > 1, out
+        node.children = out
+
+    @dispatch(model.Choice)
+    def visitChoice(cls, node):
+        out = []
+        for child in node.children:
+            cls.visit(child)
+            if isinstance(child, model.Choice):
+                out.extend(child.children)
+            else:
+                out.append(child)
+        assert len(out) > 1, out
+        node.children = out
+
+    @dispatch(model.File, model.StructDecl, model.UnionDecl, model.ExternDecl,
+        model.RuleDecl, model.MatchValue, model.Set, model.Append,
+        model.Lookahead, model.Call, model.StructLiteral, model.ListLiteral,
+        model.Repeat, model.Slice, model.FieldDecl)
+    def visitNode(cls, node):
+        for slot in node.__slots__:
+            cls.visit(getattr(node, slot))
+
+
 def process(f, status):
     semantic = SemanticPass(status)
     IndexGlobals.visit(f, semantic)
@@ -380,4 +428,6 @@ def process(f, status):
     CheckRules.visit(f, semantic)
     semantic.status.halt_if_errors()
     CheckUsed.visit(f, semantic)
+    semantic.status.halt_if_errors()
+    Simplify.visit(f)
     semantic.status.halt_if_errors()
