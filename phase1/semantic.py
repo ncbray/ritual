@@ -153,7 +153,12 @@ class CheckSignatures(object):
     @dispatch(model.UnionDecl)
     def visitUnionDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
-        nt.types = [ResolveType.visit(r, semantic) for r in node.refs]
+        types = []
+        for r in node.refs:
+            t = ResolveType.visit(r, semantic)
+            t.unions.append(nt)
+            types.append(t)
+        nt.types = types
 
     @dispatch(model.ExternDecl)
     def visitExternDecl(cls, node, semantic):
@@ -218,12 +223,29 @@ class CheckRules(object):
         if not types:
             return semantic.void
 
-        # Check if the types are idential.
+        # Try to unify the types.
+        guess = types[0]
         for t in types[1:]:
-            if types[0] != t:
-                break
+            # Identical types?
+            if t is guess:
+                continue
+            # The current guess can hold the new type.
+            if can_hold(guess, t):
+                continue
+            # The new type can hold the current guess.
+            if can_hold(t, guess):
+                guess = t
+                continue
+            # If the types have exactly one union in common, chose it.
+            if isinstance(guess, model.StructType) and isinstance(t, model.StructType):
+                common = set(guess.unions).intersection(set(t.unions))
+                if len(common) == 1:
+                    guess = common.pop()
+                    continue
+            # Failed to unify.
+            break
         else:
-            return types[0]
+            return guess
 
         if expected_t != semantic.void:
             # See if the expected type can hold them all.

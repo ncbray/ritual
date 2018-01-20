@@ -216,7 +216,7 @@ class Field(object):
 
 class StructType(Type):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string fields:[]Field list_cache:ListType@[no_init, backedge]'
+    __schema__ = 'name:string fields:[]Field unions:[]UnionType@[no_init, backedge] list_cache:ListType@[no_init, backedge]'
 
 
 class UnionType(Type):
