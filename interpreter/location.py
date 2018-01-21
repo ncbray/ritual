@@ -31,3 +31,21 @@ def extractLocationInfo(stream, pos):
         c = '<EOS>'
 
     return LocationInfo(line, col, c, text, ' '*col + '^')
+
+
+class CompileStatus(object):
+    def __init__(self, text):
+        self.text = text
+        self.errors = 0
+
+    def error(self, msg, loc=None):
+        if loc is None:
+            print 'ERROR %s' % msg
+        else:
+            info = extractLocationInfo(self.text, loc)
+            print 'ERROR %d:%d: %s\n%s\n%s' % (info.line, info.column, msg, info.text, info.arrow)
+        self.errors += 1
+
+    def halt_if_errors(self):
+        if self.errors:
+            raise Exception('Halting due to errors.')

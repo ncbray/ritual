@@ -160,25 +160,8 @@ rule('extern_decl', r"""$"extern"; end_of_keyword();
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); ![[^]]; File(decls)""")
 
 
-class CompileStatus(object):
-    def __init__(self, text):
-        self.text = text
-        self.errors = 0
-
-    def error(self, msg, loc=None):
-        if loc is None:
-            print 'ERROR %s' % msg
-        else:
-            info = interpreter.location.extractLocationInfo(self.text, loc)
-            print 'ERROR %d:%d: %s\n%s\n%s' % (info.line, info.column, msg, info.text, info.arrow)
-        self.errors += 1
-
-    def halt_if_errors(self):
-        if self.errors:
-            raise Exception('Halting due to errors.')
-
 def compile(name, text, out_dict):
-    status = CompileStatus(text)
+    status = interpreter.location.CompileStatus(text)
     result = p.parse('file', [], text)
     assert result.ok, result.error_message()
     f = result.value
