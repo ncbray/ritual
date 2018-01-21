@@ -51,25 +51,25 @@ class Range(object):
 @register
 class Character(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'ranges:[]Range invert:bool'
+    __schema__ = 'loc:int ranges:[]Range invert:bool'
 
 
 @register
 class MatchValue(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher'
+    __schema__ = 'loc:int expr:Matcher'
 
 
 @register
 class Slice(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher'
+    __schema__ = 'loc:int expr:Matcher'
 
 
 @register
 class Lookahead(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher invert:bool'
+    __schema__ = 'loc:int expr:Matcher invert:bool'
 
 
 @register
@@ -93,43 +93,43 @@ class Append(Matcher):
 @register
 class ListLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 't:TypeRef args:[]Matcher'
+    __schema__ = 'loc:int t:TypeRef args:[]Matcher'
 
 
 @register
 class Location(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = ''
+    __schema__ = 'loc:int'
 
 
 @register
 class StringLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:string'
+    __schema__ = 'loc:int value:string'
 
 
 @register
 class RuneLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:rune'
+    __schema__ = 'loc:int value:rune'
 
 
 @register
 class IntLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:int'
+    __schema__ = 'loc:int value:int'
 
 
 @register
 class BoolLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:bool'
+    __schema__ = 'loc:int value:bool'
 
 
 @register
 class StructLiteral(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 't:NameRef args:[]Matcher'
+    __schema__ = 'loc:int t:NameRef args:[]Matcher'
 
 
 class TypeRef(object):

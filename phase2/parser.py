@@ -1,3 +1,10 @@
+externs = {
+    'chr': unichr,
+    'chars_to_string': lambda chars: ''.join(chars),
+    'hex_to_int': lambda text: int(text, 16),
+    'dec_to_int': lambda text: int(text, 10),
+}
+
 def setup():
     import os.path
     import phase1.parser
@@ -6,12 +13,7 @@ def setup():
     with open(src_file) as f:
         src = f.read()
     phase1.parser.compile(src_file, src, globals())
-    p = buildParser(
-        chr=unichr,
-        chars_to_string=lambda chars: ''.join(chars),
-        hex_to_int=lambda text: int(text, 16),
-        dec_to_int=lambda text: int(text, 10),
-    )
+    p = buildParser(**externs)
     return p, src
 
 

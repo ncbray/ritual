@@ -43,16 +43,16 @@ rule('bool_value', r"""$"true";end_of_keyword();true|$"false";end_of_keyword();f
 # Character ranges
 rule('char_range_char', r"""escape_char() | [[\\]]; [[\^\-\]]] | [[^\^\-\]]]""")
 rule('char_range', r"""a=char_range_char(); b = a; ([[\-]]; b = char_range_char())?; Range(a, b)""")
-rule('char_match', r"""$"["; invert=($"^";true|false); ranges=[]; (ranges<<char_range())*; $"]"; Character(ranges, invert)""")
+rule('char_match', r"""l=loc(); $"["; invert=($"^";true|false); ranges=[]; (ranges<<char_range())*; $"]"; Character(l, ranges, invert)""")
 
 # Pure match expressions.
-rule('match_expr_atom', r"""(
-    char_match()
+rule('match_expr_atom', r"""l = loc();
+    ( char_match()
     | $"("; S(); e=match_expr(); S(); $")"; e
-    | $"<"; S(); e=match_expr(); S(); $">"; Slice(e)
-    | MatchValue(StringLiteral(string_value()))
-    | $"!"; S(); Lookahead(match_expr_atom(), true)
-    | $"loc"; Location()
+    | $"<"; S(); e=match_expr(); S(); $">"; Slice(l, e)
+    | MatchValue(l, StringLiteral(l, string_value()))
+    | $"!"; S(); Lookahead(l, match_expr_atom(), true)
+    | $"loc"; Location(l)
     | Call(Get(ident()),[])
     )""")
 rule('match_expr_repeat', r"""e=match_expr_atom();
@@ -72,18 +72,18 @@ rule('struct_literal_args', r"""args = []; (
     (S(); $","; S(); args << expr())*
 )?;
 args""")
-rule('expr_atom', r"""(
-    $"("; S(); e=expr(); S(); $")"; e
-    | $"<"; S(); e=expr(); S(); $">"; Slice(e)
+rule('expr_atom', r"""l=loc();
+    ($"("; S(); e=expr(); S(); $")"; e
+    | $"<"; S(); e=expr(); S(); $">"; Slice(l, e)
     | $"/"; S(); e=match_expr(); S(); $"/"; e
-    | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; ListLiteral(t, args)
-    | $"$"; S(); MatchValue(expr_atom())
-    | $"!"; S(); Lookahead(expr_atom(), true)
-    | t=name_ref(); S(); $"{"; S(); args=struct_literal_args(); S(); $"}"; StructLiteral(t, args)
-    | StringLiteral(string_value())
-    | IntLiteral(int_value())
-    | BoolLiteral(bool_value())
-    | $"loc"; S(); $"("; S(); $")"; Location()
+    | $"[]"; S(); t=type_ref(); S(); $"{"; args = []; (S(); args << expr(); (S(); $","; S(); args << expr())*)?; S(); $"}"; ListLiteral(l, t, args)
+    | $"$"; S(); MatchValue(l, expr_atom())
+    | $"!"; S(); Lookahead(l, expr_atom(), true)
+    | t=name_ref(); S(); $"{"; S(); args=struct_literal_args(); S(); $"}"; StructLiteral(l, t, args)
+    | StringLiteral(l, string_value())
+    | IntLiteral(l, int_value())
+    | BoolLiteral(l, bool_value())
+    | $"loc"; S(); $"("; S(); $")"; Location(l)
     | Get(ident())
     )""")
 rule('expr_call', r"""e = expr_atom();

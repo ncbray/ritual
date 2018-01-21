@@ -289,6 +289,7 @@ class TypeDispatcher(type):
             if not hasattr(f, '__dispatch__'):
                 continue
             for t in f.__dispatch__:
+                assert t not in d, t
                 d[t] = f
             remove.append(name)
         for name in remove:
