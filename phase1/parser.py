@@ -160,11 +160,14 @@ rule('extern_decl', r"""$"extern"; end_of_keyword();
 rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_decl()|union_decl()))*; S(); ![[^]]; File(decls)""")
 
 
-def compile(name, text, out_dict):
+def compile_src(name, text):
     status = interpreter.location.CompileStatus(text)
     result = p.parse('file', [], text)
     assert result.ok, result.error_message()
     f = result.value
     semantic.process(f, status)
-    src = generate_python.generate_source(f)
+    return generate_python.generate_source(f)
+
+def compile(name, text, out_dict):
+    src = compile_src(name, text)
     generate_python.compile_source(name, src, out_dict)
