@@ -239,6 +239,11 @@ class VoidType(Type):
     __schema__ = ''
 
 
+class PoisonType(Type):
+    __metaclass__ = base.TreeMeta
+    __schema__ = ''
+
+
 def registerTypes(p):
     for t in types:
         p.rule(interpreter.Native(t.__name__, [interpreter.Param(slot) for slot in t.__slots__], t))

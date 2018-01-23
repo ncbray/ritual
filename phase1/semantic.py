@@ -3,11 +3,17 @@ import interpreter
 import model
 
 
-def cached_list_type(t):
-    assert hasattr(t, 'list_cache'), t
-    if t.list_cache is None:
-        t.list_cache = model.ListType(t)
-    return t.list_cache
+def cached_list_type(node, t, semantic):
+    if isinstance(t, model.PoisonType):
+        return t
+    if hasattr(t, 'list_cache'):
+        if t.list_cache is None:
+            t.list_cache = model.ListType(t)
+        return t.list_cache
+    else:
+        semantic.status.error('Cannot create a list of %r.' % (t), GetLoc.visit(node))
+        return semantic.poison
+
 
 
 def can_hold(general, specific):
@@ -18,6 +24,10 @@ def can_hold(general, specific):
             if can_hold(t, specific):
                 return True
         return False
+    elif isinstance(general, model.PoisonType):
+        return True
+    elif isinstance(specific, model.PoisonType):
+        return True
     return False
 
 
@@ -33,12 +43,12 @@ class SemanticPass(object):
         self.globals = {}
         self.global_refs = set()
 
-        self.scope_name = 'global'
         self.locals = {}
         self.local_locs = []
         self.local_refs = set()
 
         self.void = model.VoidType()
+        self.poison = model.PoisonType()
         self.intrinsics = {}
         for n in ['string', 'rune', 'bool', 'int', 'location']:
             self.intrinsics[n] = model.IntrinsicType(n)
@@ -63,6 +73,7 @@ class SemanticPass(object):
         assert not isinstance(t, model.VoidType)
         if name in self.globals:
             self.status.error('Attempted to redefine "%s"' % name, loc)
+            self.globals[name] = self.poison
         else:
             assert isinstance(t, model.Type), t
             self.globals[name] = t
@@ -70,14 +81,15 @@ class SemanticPass(object):
     def setLocal(self, name, t, loc):
         assert isinstance(name, basestring), name
         assert isinstance(t, model.Type), t
-        assert not isinstance(t, model.VoidType), (self.scope_name, name)
+        assert not isinstance(t, model.VoidType), name
         if name in self.locals:
             current = self.locals[name]
             if not can_hold(current, t):
                 if can_hold(t, current):
                     self.locals[name] = t
                 else:
-                    raise Exception('Attempted to redefine "%s" (%r vs. %r)' % (name, current, t))
+                    self.status.error('Attempted to redefine "%s" (%r vs. %r)' % (name, current, t), loc)
+                    self.locals[name] = self.poison
         else:
             self.locals[name] = t
             self.local_locs.append((name, loc))
@@ -118,11 +130,21 @@ class IndexGlobals(object):
 class GetLoc(object):
     __metaclass__ = TypeDispatcher
 
-    @dispatch(model.Get)
+    @dispatch(model.ListRef)
+    def visitListRef(cls, node):
+        # TODO more accurate
+        return cls.visit(node.ref)
+
+    @dispatch(model.Get, model.NameRef)
     def visitGet(cls, node):
         return node.name.loc
 
-    @dispatch(model.Character, model.Slice, model.ListLiteral,
+    @dispatch(model.Sequence, model.Choice)
+    def visitSequence(cls, node):
+        return GetLoc.visit(node.children[0])
+
+
+    @dispatch(model.Character, model.Slice, model.ListLiteral, model.StructLiteral,
         model.StringLiteral, model.BoolLiteral, model.IntLiteral)
     def visitSimple(cls, node):
         return node.loc
@@ -147,11 +169,12 @@ class ResolveType(object):
             semantic.globalIsUsed(name)
             return semantic.globals[name]
         else:
-            raise Exception('Unknown type "%s"' % name)
+            semantic.status.error('Unknown type "%s"' % name, node.name.loc)
+            return semantic.poison
 
     @dispatch(model.ListRef)
     def visitListRef(cls, node, semantic):
-        return cached_list_type(cls.visit(node.ref, semantic))
+        return cached_list_type(node.ref, cls.visit(node.ref, semantic), semantic)
 
 
 class CheckSignatures(object):
@@ -207,9 +230,7 @@ class CheckRules(object):
     def visitRuleDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
 
-        old_name = semantic.scope_name
         old_locals = semantic.locals
-        semantic.scope_name = node.name.text
         semantic.locals = {}
         semantic.local_locs = []
         semantic.local_refs = set()
@@ -227,7 +248,6 @@ class CheckRules(object):
                 semantic.status.error('Unused local "%s"' % name, loc)
 
         semantic.locals = old_locals
-        semantic.scope_name = old_name
 
     @dispatch(model.Repeat)
     def visitRepeat(cls, node, value_used, semantic):
@@ -268,7 +288,7 @@ class CheckRules(object):
 
         if value_used:
             semantic.status.error('Cannot unify types: %r' % types)
-        return semantic.void
+        return semantic.poison
 
     @dispatch(model.Sequence)
     def visitSequence(cls, node, value_used, semantic):
@@ -307,9 +327,8 @@ class CheckRules(object):
         args = [cls.visit(arg, True, semantic) for arg in node.args]
 
         if not isinstance(expr, model.CallableType):
-            # TODO still evaluate args?
-            semantic.status.error('Cannot call %r in %s' % (type(expr), semantic.scope_name))
-            return semantic.void
+            semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
+            return semantic.poison
 
         if len(args) != len(expr.params):
             semantic.status.error('Expected %d arguments, got %d instead.' % (len(expr.params), len(args)), GetLoc.visit(node))
@@ -324,28 +343,32 @@ class CheckRules(object):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         st = ResolveType.visit(node.t, semantic)
-        if isinstance(st, model.StructType):
-            for i, arg in enumerate(node.args):
-                if i < len(st.fields):
-                    ft = st.fields[i].t
-                    t = cls.visit(arg, ft, semantic)
-                    assert can_hold(ft, t), (ft, t)
-                else:
-                    cls.visit(arg, semantic.void, semantic)
-            assert len(st.fields) == len(node.args), (node, st.fields)
-            return st
+        args = [cls.visit(arg, True, semantic) for arg in node.args]
+
+        if not isinstance(st, model.StructType):
+            semantic.status.error('Not a struct', GetLoc.visit(node.t))
+            return semantic.poison
+
+        if len(args) != len(st.fields):
+            semantic.status.error('Expected %d arguments, got %d instead.' % (len(st.fields), len(args)), GetLoc.visit(node))
         else:
-            raise Exception('Not a struct: %r in %s' % (st, semantic.scope_name))
+            for f, at, a in zip(st.fields, args, node.args):
+                if not can_hold(f.t, at):
+                    semantic.status.error('Expected %r, got %r instead.' % (f.t, at), GetLoc.visit(a))
+        return st
 
     @dispatch(model.ListLiteral)
     def visitListLiteral(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         t = ResolveType.visit(node.t, semantic)
-        for arg in node.args:
-            at = cls.visit(arg, t, semantic)
-            assert can_hold(t, at), (t, at, arg)
-        return cached_list_type(t)
+        args = [cls.visit(arg, True, semantic) for arg in node.args]
+        lt = cached_list_type(node.t, t, semantic)
+        if isinstance(lt, model.ListType):
+            for arg, at in zip(node.args, args):
+                if not can_hold(t, at):
+                    semantic.status.error('Expected %r, got %r instead.' % (t, at), GetLoc.visit(arg))
+        return lt
 
     @dispatch(model.Get)
     def visitGet(cls, node, value_used, semantic):
@@ -354,7 +377,8 @@ class CheckRules(object):
         name = node.name.text
         t = semantic.resolveSlot(name, True)
         if t is None:
-            raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
+            semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
+            t = semantic.poison
         return t
 
     @dispatch(model.Set)
@@ -362,7 +386,8 @@ class CheckRules(object):
         name = node.name.text
         t = cls.visit(node.expr, True, semantic)
         if t == semantic.void:
-            raise Exception('Cannot assign void to "%s" in %s' % (name, semantic.scope_name))
+            semantic.status.error('Cannot assign void to "%s"' % (name,), node.name.loc)
+            t = semantic.poison
         semantic.setLocal(name, t, node.name.loc)
         return t
 
@@ -371,13 +396,15 @@ class CheckRules(object):
         name = node.name.text
         lt = semantic.resolveSlot(name, False)
         if lt is None:
-            raise Exception('Cannot resolve "%s" in %s' % (name, semantic.scope_name))
+            semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
+        t = cls.visit(node.expr, True, semantic)
         # TODO assert is a local
+        if lt is semantic.poison:
+            return lt
         if not isinstance(lt, model.ListType):
-            raise Exception('Cannot append to %r' % (lt,))
-        t = cls.visit(node.expr, lt.t, semantic)
-        if not can_hold(lt.t, t):
-            raise Exception('Cannot append %r to %r' % (t, lt))
+            semantic.status.error('Cannot append to "%r"' % (lt,), node.name.loc)
+        elif not can_hold(lt.t, t):
+            semantic.status.error('Cannot append %r to %r' % (t, lt), node.name.loc)
         return t
 
     @dispatch(model.Location)
