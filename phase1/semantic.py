@@ -176,6 +176,10 @@ class ResolveType(object):
     def visitListRef(cls, node, semantic):
         return cached_list_type(node.ref, cls.visit(node.ref, semantic), semantic)
 
+    @dispatch(model.DirectRef)
+    def visitDirectRef(cls, node, semantic):
+        return node.t
+
 
 class CheckSignatures(object):
     __metaclass__ = TypeDispatcher
@@ -189,29 +193,50 @@ class CheckSignatures(object):
     def visitStruct(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
         for f in node.fields:
-            nt.fields.append(model.Field(f.name.text, ResolveType.visit(f.t, semantic)))
+            ft =  ResolveType.visit(f.t, semantic)
+            nt.fields.append(model.Field(f.name.text, ft))
+            f.t = model.DirectRef(ft)
 
     @dispatch(model.UnionDecl)
     def visitUnionDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
         types = []
-        for r in node.refs:
+        for i, r in enumerate(node.refs):
             t = ResolveType.visit(r, semantic)
             t.unions.append(nt)
             types.append(t)
+            node.refs[i] = model.DirectRef(t)
         nt.types = types
 
     @dispatch(model.ExternDecl)
     def visitExternDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
-        nt.params = [ResolveType.visit(p.t, semantic) for p in node.params]
-        nt.rt = ResolveType.visit(node.rt, semantic)
+
+        params = []
+        for p in node.params:
+            t = ResolveType.visit(p.t, semantic)
+            p.t = model.DirectRef(t)
+            params.append(t)
+        nt.params = params
+
+        rt = ResolveType.visit(node.rt, semantic)
+        node.rt = model.DirectRef(rt)
+        nt.rt = rt
 
     @dispatch(model.RuleDecl)
     def visitRuleDecl(cls, node, semantic):
         nt = semantic.globals[node.name.text] # HACK
-        nt.params = [ResolveType.visit(p.t, semantic) for p in node.params]
-        nt.rt = ResolveType.visit(node.rt, semantic)
+
+        params = []
+        for p in node.params:
+            t = ResolveType.visit(p.t, semantic)
+            p.t = model.DirectRef(t)
+            params.append(t)
+        nt.params = params
+
+        rt = ResolveType.visit(node.rt, semantic)
+        node.rt = model.DirectRef(rt)
+        nt.rt = rt
 
 
 class CheckRules(object):
@@ -343,6 +368,7 @@ class CheckRules(object):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         st = ResolveType.visit(node.t, semantic)
+        node.t = model.DirectRef(st)
         args = [cls.visit(arg, True, semantic) for arg in node.args]
 
         if not isinstance(st, model.StructType):
@@ -362,6 +388,8 @@ class CheckRules(object):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         t = ResolveType.visit(node.t, semantic)
+        node.t = model.DirectRef(t)
+
         args = [cls.visit(arg, True, semantic) for arg in node.args]
         lt = cached_list_type(node.t, t, semantic)
         if isinstance(lt, model.ListType):
@@ -461,8 +489,8 @@ class Simplify(object):
         for child in node:
             cls.visit(child)
 
-    @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.Get,
-        model.Character, bool, str, unicode, int, model.Attribute,
+    @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.DirectRef,
+        model.Get, model.Character, bool, str, unicode, int, model.Attribute,
         model.StringLiteral, model.BoolLiteral, model.IntLiteral,
         model.RuneLiteral, model.Location)
     def visitLeaf(cls, node):

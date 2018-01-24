@@ -148,6 +148,11 @@ class ListRef(TypeRef):
     __schema__ = 'ref:TypeRef'
 
 
+class DirectRef(TypeRef):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 't:Type@[backedge]'
+
+
 class Decl(object):
     __slots__ = []
 

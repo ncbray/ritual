@@ -12,23 +12,42 @@ alternate_tree_names = {
 class TreeType(object):
     __metaclass__ = TypeDispatcher
 
-    @dispatch(model.NameRef)
-    def visitNameRef(cls, node):
-        name = node.name.text
+    @dispatch(model.IntrinsicType)
+    def visitIntrinsicType(cls, node):
+        name = node.name
         return alternate_tree_names.get(name, name)
 
-    @dispatch(model.ListRef)
-    def visitListRef(cls, node):
-        return '[]' + cls.visit(node.ref)
+    @dispatch(model.StructType)
+    def visitStructType(cls, node):
+        return node.name
+
+    @dispatch(model.UnionType)
+    def visitUnionType(cls, node):
+        return node.name
+
+    @dispatch(model.ListType)
+    def visitListType(cls, node):
+        return '[]' + cls.visit(node.t)
+
+    @dispatch(model.DirectRef)
+    def visitDirectRef(cls, node):
+        return cls.visit(node.t)
 
 
 class PythonType(object):
     __metaclass__ = TypeDispatcher
 
-    @dispatch(model.NameRef)
-    def visitNameRef(cls, node):
-        name = node.name.text
-        return python_types.get(name, name)
+    @dispatch(model.StructType)
+    def visitStructType(cls, node):
+        return node.name
+
+    @dispatch(model.UnionType)
+    def visitUnionType(cls, node):
+        return node.name
+
+    @dispatch(model.DirectRef)
+    def visitDirectRef(cls, node):
+        return cls.visit(node.t)
 
 
 alternate_names = {
