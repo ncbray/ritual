@@ -264,7 +264,7 @@ class CheckRules(object):
         for p, t in zip(node.params, nt.params):
             semantic.setLocal(p.name.text, t, p.name.loc)
 
-        actual = cls.visit(node.body, expected is not semantic.void, semantic)
+        node.body, actual = cls.visit(node.body, expected is not semantic.void, semantic)
         if expected is not semantic.void and not can_hold(expected, actual):
             semantic.status.error('Expected return type of %r, got %r instead.' % (expected, actual), node.name.loc)
 
@@ -276,16 +276,29 @@ class CheckRules(object):
 
     @dispatch(model.Repeat)
     def visitRepeat(cls, node, value_used, semantic):
-        t = cls.visit(node.expr, value_used, semantic)
+        node.expr, t = cls.visit(node.expr, value_used, semantic)
         # TODO nullable.
-        return t if node.min > 0 else semantic.void
+        return node, t if node.min > 0 else semantic.void
+
+    @classmethod
+    def visitArgs(cls, args, semantic):
+        children = []
+        types = []
+        for expr in args:
+            expr, t = cls.visit(expr, True, semantic)
+            children.append(expr)
+            types.append(t)
+        return children, types
 
     @dispatch(model.Choice)
     def visitChoice(cls, node, value_used, semantic):
-        types = [cls.visit(expr, value_used, semantic) for expr in node.children]
+        node.children, types = cls.visitArgs(node.children, semantic)
+
+        if len(node.children) == 1:
+            node = node.children[0]
 
         if not types:
-            return semantic.void
+            return node, semantic.void
 
         # Try to unify the types.
         guess = types[0]
@@ -309,51 +322,56 @@ class CheckRules(object):
             # Failed to unify.
             break
         else:
-            return guess
+            return node, guess
 
         if value_used:
             semantic.status.error('Cannot unify types: %r' % types)
-        return semantic.poison
+        return node, semantic.poison
 
     @dispatch(model.Sequence)
     def visitSequence(cls, node, value_used, semantic):
         t = semantic.void
+        children = []
         for i, expr in enumerate(node.children):
             child_used = value_used and i == len(node.children) - 1
-            t = cls.visit(expr, child_used, semantic)
-        return t
+            expr, t = cls.visit(expr, child_used, semantic)
+            children.append(expr)
+        node.children = children
+        if len(node.children) == 1:
+            node = node.children[0]
+        return node, t
 
     @dispatch(model.Character)
     def visitCharacter(cls, node, value_used, semantic):
-        return semantic.intrinsics['rune']
+        return node, semantic.intrinsics['rune']
 
     @dispatch(model.MatchValue)
     def visitMatchValue(cls, node, value_used, semantic):
-        return cls.visit(node.expr, True, semantic)
+        node.expr, t = cls.visit(node.expr, True, semantic)
+        return node, t
 
     @dispatch(model.Slice)
     def visitSlice(cls, node, value_used, semantic):
-        cls.visit(node.expr, False, semantic)
+        node.expr, _ = cls.visit(node.expr, False, semantic)
         if not value_used:
             semantic.status.error('Unused slice.', node.loc)
-        return semantic.intrinsics['string']
+        return node, semantic.intrinsics['string']
 
     @dispatch(model.Lookahead)
     def visitLookahead(cls, node, value_used, semantic):
-        t = cls.visit(node.expr, value_used and not node.invert, semantic)
+        node.expr, t = cls.visit(node.expr, value_used and not node.invert, semantic)
         if node.invert:
-            return semantic.void
-        else:
-            return t
+            t = semantic.void
+        return node, t
 
     @dispatch(model.Call)
     def visitCall(cls, node, value_used, semantic):
-        expr = cls.visit(node.expr, semantic.void, semantic)
-        args = [cls.visit(arg, True, semantic) for arg in node.args]
+        node.expr, expr = cls.visit(node.expr, semantic.void, semantic)
+        node.args, args = cls.visitArgs(node.args, semantic)
 
         if not isinstance(expr, model.CallableType):
             semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
-            return semantic.poison
+            return node, semantic.poison
 
         if len(args) != len(expr.params):
             semantic.status.error('Expected %d arguments, got %d instead.' % (len(expr.params), len(args)), GetLoc.visit(node))
@@ -361,7 +379,7 @@ class CheckRules(object):
             for pt, at, a in zip(expr.params, args, node.args):
                 if not can_hold(pt, at):
                     semantic.status.error('Expected %r, got %r instead.' % (pt, at), GetLoc.visit(a))
-        return expr.rt
+        return node, expr.rt
 
     @dispatch(model.StructLiteral)
     def visitStructLiteral(cls, node, value_used, semantic):
@@ -369,11 +387,11 @@ class CheckRules(object):
             semantic.status.error('Unused literal.', node.loc)
         st = ResolveType.visit(node.t, semantic)
         node.t = model.DirectRef(st)
-        args = [cls.visit(arg, True, semantic) for arg in node.args]
+        node.args, args = cls.visitArgs(node.args, semantic)
 
         if not isinstance(st, model.StructType):
             semantic.status.error('Not a struct', GetLoc.visit(node.t))
-            return semantic.poison
+            return node, semantic.poison
 
         if len(args) != len(st.fields):
             semantic.status.error('Expected %d arguments, got %d instead.' % (len(st.fields), len(args)), GetLoc.visit(node))
@@ -381,7 +399,7 @@ class CheckRules(object):
             for f, at, a in zip(st.fields, args, node.args):
                 if not can_hold(f.t, at):
                     semantic.status.error('Expected %r, got %r instead.' % (f.t, at), GetLoc.visit(a))
-        return st
+        return node, st
 
     @dispatch(model.ListLiteral)
     def visitListLiteral(cls, node, value_used, semantic):
@@ -390,13 +408,13 @@ class CheckRules(object):
         t = ResolveType.visit(node.t, semantic)
         node.t = model.DirectRef(t)
 
-        args = [cls.visit(arg, True, semantic) for arg in node.args]
+        node.args, args = cls.visitArgs(node.args, semantic)
         lt = cached_list_type(node.t, t, semantic)
         if isinstance(lt, model.ListType):
             for arg, at in zip(node.args, args):
                 if not can_hold(t, at):
                     semantic.status.error('Expected %r, got %r instead.' % (t, at), GetLoc.visit(arg))
-        return lt
+        return node, lt
 
     @dispatch(model.Get)
     def visitGet(cls, node, value_used, semantic):
@@ -407,17 +425,17 @@ class CheckRules(object):
         if t is None:
             semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
             t = semantic.poison
-        return t
+        return node, t
 
     @dispatch(model.Set)
     def visitSet(cls, node, value_used, semantic):
         name = node.name.text
-        t = cls.visit(node.expr, True, semantic)
+        node.expr, t = cls.visit(node.expr, True, semantic)
         if t == semantic.void:
             semantic.status.error('Cannot assign void to "%s"' % (name,), node.name.loc)
             t = semantic.poison
         semantic.setLocal(name, t, node.name.loc)
-        return t
+        return node, t
 
     @dispatch(model.Append)
     def visitAppend(cls, node, value_used, semantic):
@@ -425,45 +443,45 @@ class CheckRules(object):
         lt = semantic.resolveSlot(name, False)
         if lt is None:
             semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
-        t = cls.visit(node.expr, True, semantic)
+        node.expr, t = cls.visit(node.expr, True, semantic)
         # TODO assert is a local
         if lt is semantic.poison:
-            return lt
-        if not isinstance(lt, model.ListType):
+            pass
+        elif not isinstance(lt, model.ListType):
             semantic.status.error('Cannot append to "%r"' % (lt,), node.name.loc)
         elif not can_hold(lt.t, t):
             semantic.status.error('Cannot append %r to %r' % (t, lt), node.name.loc)
-        return t
+        return node, t
 
     @dispatch(model.Location)
     def visitLocation(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused location.', node.loc)
-        return semantic.intrinsics['location']
+        return node, semantic.intrinsics['location']
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
-        return semantic.intrinsics['string']
+        return node, semantic.intrinsics['string']
 
     @dispatch(model.RuneLiteral)
     def visitRuneLiteral(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
-        return semantic.intrinsics['rune']
+        return node, semantic.intrinsics['rune']
 
     @dispatch(model.IntLiteral)
     def visitIntLiteral(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
-        return semantic.intrinsics['int']
+        return node, semantic.intrinsics['int']
 
     @dispatch(model.BoolLiteral)
     def visitBoolLiteral(cls, node, value_used, semantic):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
-        return semantic.intrinsics['bool']
+        return node, semantic.intrinsics['bool']
 
 
 class CheckUsed(object):
