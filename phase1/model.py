@@ -42,6 +42,11 @@ class Call(Matcher):
     __schema__ = 'expr:Matcher args:[]Matcher'
 
 
+class DirectCall(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'func:CallableType@[backedge] args:[]Matcher'
+
+
 @register
 class Range(object):
     __metaclass__ = base.TreeMeta
@@ -235,6 +240,15 @@ class ListType(Type):
 
 
 class CallableType(Type):
+    __slots__ = []
+
+
+class ExternType(CallableType):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge]'
+
+
+class RuleType(CallableType):
     __metaclass__ = base.TreeMeta
     __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge]'
 

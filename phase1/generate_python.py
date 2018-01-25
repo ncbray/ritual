@@ -80,9 +80,16 @@ class GenerateInterpreter(object):
             [cls.visit(arg) for arg in node.args]
         )
 
+    @dispatch(model.DirectCall)
+    def visitDirectCall(cls, node):
+        return interpreter.Call(
+            interpreter.Get(node.func.name),
+            cls.visit(node.args),
+        )
+
     @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
         model.Range, model.MatchValue, model.ListLiteral, model.Slice,
-        model.Call, model.Get, model.Set, model.Append, model.StringLiteral,
+        model.Get, model.Set, model.Append, model.StringLiteral,
         model.RuneLiteral, model.IntLiteral, model.BoolLiteral, model.Location,
         model.Lookahead)
     def visitNode(cls, node):

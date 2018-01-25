@@ -103,10 +103,16 @@ class IndexGlobals(object):
         for decl in node.decls:
             cls.visit(decl, semantic)
 
-    @dispatch(model.RuleDecl, model.ExternDecl)
-    def visitCallableDecl(cls, node, semantic):
+    @dispatch(model.ExternDecl)
+    def visitExternDecl(cls, node, semantic):
         name = node.name.text
-        t = model.CallableType(name)
+        t = model.ExternType(name)
+        semantic.declareGlobal(name, t, node.name.loc)
+
+    @dispatch(model.RuleDecl)
+    def visitRuleDecl(cls, node, semantic):
+        name = node.name.text
+        t = model.RuleType(name)
         semantic.declareGlobal(name, t, node.name.loc)
         if hasattr(node, 'attrs'):
             for attr in node.attrs:
@@ -369,7 +375,9 @@ class CheckRules(object):
         node.expr, expr = cls.visit(node.expr, semantic.void, semantic)
         node.args, args = cls.visitArgs(node.args, semantic)
 
-        if not isinstance(expr, model.CallableType):
+        if isinstance(expr, model.CallableType):
+            node = model.DirectCall(expr, node.args)
+        else:
             semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
             return node, semantic.poison
 
@@ -510,7 +518,7 @@ class Simplify(object):
     @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.DirectRef,
         model.Get, model.Character, bool, str, unicode, int, model.Attribute,
         model.StringLiteral, model.BoolLiteral, model.IntLiteral,
-        model.RuneLiteral, model.Location)
+        model.RuneLiteral, model.Location, model.RuleType, model.ExternType)
     def visitLeaf(cls, node):
         pass
 
@@ -540,7 +548,7 @@ class Simplify(object):
 
     @dispatch(model.File, model.StructDecl, model.UnionDecl, model.ExternDecl,
         model.RuleDecl, model.MatchValue, model.Set, model.Append,
-        model.Lookahead, model.Call, model.StructLiteral, model.ListLiteral,
+        model.Lookahead, model.DirectCall, model.StructLiteral, model.ListLiteral,
         model.Repeat, model.Slice, model.FieldDecl)
     def visitNode(cls, node):
         for slot in node.__slots__:

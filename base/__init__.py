@@ -289,7 +289,8 @@ class TypeDispatcher(type):
             if not hasattr(f, '__dispatch__'):
                 continue
             for t in f.__dispatch__:
-                assert t not in d, t
+                if t in d:
+                    raise Exception('Multiple dispatchers for %r in %s'% (t, cls_name))
                 d[t] = f
             remove.append(name)
         for name in remove:
