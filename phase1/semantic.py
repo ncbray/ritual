@@ -44,7 +44,6 @@ class SemanticPass(object):
         self.global_refs = set()
 
         self.locals = {}
-        self.local_locs = []
         self.local_refs = set()
 
         self.void = model.VoidType()
@@ -52,6 +51,8 @@ class SemanticPass(object):
         self.intrinsics = {}
         for n in ['string', 'rune', 'bool', 'int', 'location']:
             self.intrinsics[n] = model.IntrinsicType(n)
+
+        self.current_rule = None
 
     def globalIsUsed(self, name):
         assert isinstance(name, basestring), name
@@ -83,16 +84,18 @@ class SemanticPass(object):
         assert isinstance(t, model.Type), t
         assert not isinstance(t, model.VoidType), name
         if name in self.locals:
-            current = self.locals[name]
+            lcl = self.locals[name]
+            current = lcl.t
             if not can_hold(current, t):
                 if can_hold(t, current):
-                    self.locals[name] = t
+                    lcl.t = t
                 else:
                     self.status.error('Attempted to redefine "%s" (%r vs. %r)' % (name, current, t), loc)
-                    self.locals[name] = self.poison
+                    lcl.t = self.poison
         else:
-            self.locals[name] = t
-            self.local_locs.append((name, loc))
+            lcl = model.Local(loc, name, t)
+            self.locals[name] = lcl
+        return lcl
 
 
 class IndexGlobals(object):
@@ -263,8 +266,9 @@ class CheckRules(object):
 
         old_locals = semantic.locals
         semantic.locals = {}
-        semantic.local_locs = []
         semantic.local_refs = set()
+        semantic.current_rule = nt
+
         expected = ResolveType.visit(node.rt, semantic)
 
         for p, t in zip(node.params, nt.params):
@@ -274,10 +278,11 @@ class CheckRules(object):
         if expected is not semantic.void and not can_hold(expected, actual):
             semantic.status.error('Expected return type of %r, got %r instead.' % (expected, actual), node.name.loc)
 
-        for name, loc in semantic.local_locs:
-            if name not in semantic.local_refs:
-                semantic.status.error('Unused local "%s"' % name, loc)
+        for lcl in semantic.current_rule.locals:
+            if lcl.name not in semantic.local_refs:
+                semantic.status.error('Unused local "%s"' % lcl.name, lcl.loc)
 
+        semantic.current_rule = None
         semantic.locals = old_locals
 
     @dispatch(model.Repeat)
@@ -433,6 +438,9 @@ class CheckRules(object):
         if t is None:
             semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
             t = semantic.poison
+        if isinstance(t, model.Local):
+            node = model.GetLocal(t)
+            t = t.t
         return node, t
 
     @dispatch(model.Set)
@@ -442,23 +450,31 @@ class CheckRules(object):
         if t == semantic.void:
             semantic.status.error('Cannot assign void to "%s"' % (name,), node.name.loc)
             t = semantic.poison
-        semantic.setLocal(name, t, node.name.loc)
+        lcl = semantic.setLocal(name, t, node.name.loc)
+        node = model.SetLocal(node.expr, lcl)
         return node, t
 
     @dispatch(model.Append)
     def visitAppend(cls, node, value_used, semantic):
         name = node.name.text
+        loc = node.name.loc
         lt = semantic.resolveSlot(name, False)
         if lt is None:
-            semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
+            semantic.status.error('Cannot resolve "%s"' % (name,), oc)
+
         node.expr, t = cls.visit(node.expr, True, semantic)
-        # TODO assert is a local
+        if isinstance(lt, model.Local):
+            node = model.AppendLocal(node.expr, lt)
+            lt = lt.t
+        elif lt is not semantic.poison:
+            semantic.status.error('"%s" is not a local' % (name,), loc)
+
         if lt is semantic.poison:
             pass
         elif not isinstance(lt, model.ListType):
-            semantic.status.error('Cannot append to "%r"' % (lt,), node.name.loc)
+            semantic.status.error('Cannot append to "%r"' % (lt,), loc)
         elif not can_hold(lt.t, t):
-            semantic.status.error('Cannot append %r to %r' % (t, lt), node.name.loc)
+            semantic.status.error('Cannot append %r to %r' % (t, lt), loc)
         return node, t
 
     @dispatch(model.Location)
@@ -516,8 +532,8 @@ class Simplify(object):
             cls.visit(child)
 
     @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.DirectRef,
-        model.Get, model.Character, bool, str, unicode, int, model.Attribute,
-        model.StringLiteral, model.BoolLiteral, model.IntLiteral,
+        model.GetLocal, model.Character, bool, str, unicode, int, model.Local,
+        model.Attribute, model.StringLiteral, model.BoolLiteral, model.IntLiteral,
         model.RuneLiteral, model.Location, model.RuleType, model.ExternType)
     def visitLeaf(cls, node):
         pass
@@ -547,7 +563,7 @@ class Simplify(object):
         node.children = out
 
     @dispatch(model.File, model.StructDecl, model.UnionDecl, model.ExternDecl,
-        model.RuleDecl, model.MatchValue, model.Set, model.Append,
+        model.RuleDecl, model.MatchValue, model.SetLocal, model.AppendLocal,
         model.Lookahead, model.DirectCall, model.StructLiteral, model.ListLiteral,
         model.Repeat, model.Slice, model.FieldDecl)
     def visitNode(cls, node):

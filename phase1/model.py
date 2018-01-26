@@ -96,6 +96,24 @@ class Append(Matcher):
 
 
 @register
+class GetLocal(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'lcl:Local@[backedge]'
+
+
+@register
+class SetLocal(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher lcl:Local@[backedge]'
+
+
+@register
+class AppendLocal(Matcher):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'expr:Matcher lcl:Local@[backedge]'
+
+
+@register
 class ListLiteral(Matcher):
     __metaclass__ = base.TreeMeta
     __schema__ = 'loc:int t:TypeRef args:[]Matcher'
@@ -248,9 +266,14 @@ class ExternType(CallableType):
     __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge]'
 
 
+class Local(object):
+    __metaclass__ = base.TreeMeta
+    __schema__ = 'loc:int name:string t:Type'
+
+
 class RuleType(CallableType):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge]'
+    __schema__ = 'name:string params:[]Type@[no_init, backedge] rt:Type@[no_init, backedge] locals:[]Local@[no_init]'
 
 
 class VoidType(Type):

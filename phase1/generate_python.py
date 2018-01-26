@@ -87,11 +87,22 @@ class GenerateInterpreter(object):
             cls.visit(node.args),
         )
 
+    @dispatch(model.GetLocal)
+    def visitGetLocal(cls, node):
+        return interpreter.Get(node.lcl.name)
+
+    @dispatch(model.SetLocal)
+    def visitSetLocal(cls, node):
+        return interpreter.Set(cls.visit(node.expr), node.lcl.name)
+
+    @dispatch(model.AppendLocal)
+    def visitAppendLocal(cls, node):
+        return interpreter.Append(cls.visit(node.expr), node.lcl.name)
+
     @dispatch(model.Choice, model.Sequence, model.Repeat, model.Character,
         model.Range, model.MatchValue, model.ListLiteral, model.Slice,
-        model.Get, model.Set, model.Append, model.StringLiteral,
-        model.RuneLiteral, model.IntLiteral, model.BoolLiteral, model.Location,
-        model.Lookahead)
+        model.StringLiteral, model.RuneLiteral, model.IntLiteral, model.BoolLiteral,
+        model.Location, model.Lookahead)
     def visitNode(cls, node):
         # Assume named fields can be mapped to each other.
         n = type(node).__name__
