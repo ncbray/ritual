@@ -383,7 +383,8 @@ class CheckRules(object):
         if isinstance(expr, model.CallableType):
             node = model.DirectCall(expr, node.args)
         else:
-            semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
+            if not isinstance(expr, model.PoisonType):
+                semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
             return node, semantic.poison
 
         if len(args) != len(expr.params):
