@@ -1,0 +1,87 @@
+struct Token {
+  loc:location
+  text:string
+}
+
+struct TypeRef {
+  name:Token
+}
+struct ScalarPortDecl {
+  t:TypeRef
+  names:[]Token
+}
+struct IndexedPortDecl {
+  t:TypeRef
+  name:Token
+}
+struct BagPortDecl {
+  t:TypeRef
+  name:Token
+}
+union PortDecl = ScalarPortDecl | IndexedPortDecl | BagPortDecl;
+
+struct StructDecl {
+  name:Token
+}
+struct EdgeDecl {
+  name:Token
+  src:PortDecl
+  dst:PortDecl
+}
+union Decl = StructDecl | EdgeDecl;
+
+struct File {
+  decls:[]Decl
+}
+
+func S():void {
+    /([ \t\n\r]|"//"[^\n]*)*/
+}
+func end_of_keyword():void {
+    /![a-zA-Z_0-9]/
+}
+func ident():Token {
+    Token{loc(), </[a-zA-Z_][a-zA-Z_0-9]*/>}
+}
+
+func type_ref():TypeRef {
+  TypeRef{ident()}
+}
+func struct_decl():StructDecl {
+  /"struct" end_of_keyword S name=ident S "{" S "}"/;
+  StructDecl{name}
+}
+func scalar_names():[]Token {
+  []Token{ident()}
+  | /"{" S/;
+    names=[]Token{ident()};
+    (/S "," S/; names<<ident())*;
+    /S "}"/;
+    names
+}
+func port_decl():PortDecl {
+  decl =
+    ( /"scalar" S t=type_ref S names=scalar_names/; ScalarPortDecl{t, names}
+    | /"indexed" S t=type_ref S name=ident/; IndexedPortDecl{t, name}
+    | /"bag" S t=type_ref S name=ident/; BagPortDecl{t, name}
+    );
+  /S ";"/;
+  decl
+}
+func edge_decl():EdgeDecl {
+  /"edge" end_of_keyword S name=ident S "{" S src=port_decl S dst=port_decl S "}"/;
+  EdgeDecl{name, src, dst}
+}
+
+func decl():Decl {
+  struct_decl()|edge_decl()
+}
+
+[export]
+func file():File {
+  decls = []Decl{};
+  (S(); decls<<decl())*;
+  S();
+  /![^]/;
+  File{decls}
+}
