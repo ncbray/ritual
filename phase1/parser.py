@@ -4,6 +4,7 @@ import phase0.parser
 
 import generate_python
 import model
+import optimize
 import semantic
 
 p = Parser()
@@ -166,6 +167,7 @@ def compile_src(name, text):
     assert result.ok, result.error_message()
     f = result.value
     semantic.process(f, status)
+    optimize.process(f, status)
     return generate_python.generate_source(f)
 
 def compile(name, text, out_dict):
