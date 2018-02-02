@@ -72,11 +72,20 @@ class DoOpt(object):
         node.ranges, node.invert = canonical_to_model(ranges)
         return node
 
+    @dispatch(model.MatchValue)
+    def visitMatchValue(cls, node, opt):
+        node.expr = cls.visit(node.expr, opt)
+        if isinstance(node.expr, model.StringLiteral) and len(node.expr.value) == 1:
+            # Convert single-character string into character match.
+            c = node.expr.value[0]
+            return model.Character(node.loc, [model.Range(c, c)], False)
+        return node
+
     @dispatch(model.GetLocal, model.StringLiteral, model.IntLiteral, model.BoolLiteral, model.RuneLiteral, model.Location)
     def visitLeaf(cls, node, opt):
         return node
 
-    @dispatch(model.MatchValue, model.Lookahead, model.SetLocal, model.AppendLocal, model.Slice, model.Repeat)
+    @dispatch(model.Lookahead, model.SetLocal, model.AppendLocal, model.Slice, model.Repeat)
     def visitSimpleExpr(cls, node, opt):
         node.expr = cls.visit(node.expr, opt)
         return node
