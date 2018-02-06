@@ -148,6 +148,10 @@ class GetLoc(object):
     def visitGet(cls, node):
         return node.name.loc
 
+    @dispatch(model.GetLocal)
+    def visitGetLocal(cls, node):
+        return node.loc
+
     @dispatch(model.Sequence, model.Choice)
     def visitSequence(cls, node):
         return GetLoc.visit(node.children[0])
@@ -384,7 +388,7 @@ class CheckRules(object):
             node = model.DirectCall(expr, node.args)
         else:
             if not isinstance(expr, model.PoisonType):
-                semantic.status.error('Cannot call %r' % (expr,), GetLoc.visit(node.expr))
+                semantic.status.error('Cannot call %r' % (expr,), node.loc)
             return node, semantic.poison
 
         if len(args) != len(expr.params):
@@ -440,7 +444,7 @@ class CheckRules(object):
             semantic.status.error('Cannot resolve "%s"' % (name,), node.name.loc)
             t = semantic.poison
         if isinstance(t, model.Local):
-            node = model.GetLocal(t)
+            node = model.GetLocal(node.name.loc, t)
             t = t.t
         return node, t
 

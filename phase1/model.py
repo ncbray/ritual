@@ -39,7 +39,7 @@ class Repeat(Matcher):
 @register
 class Call(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'expr:Matcher args:[]Matcher'
+    __schema__ = 'loc:int expr:Matcher args:[]Matcher'
 
 
 class DirectCall(Matcher):
@@ -98,7 +98,7 @@ class Append(Matcher):
 @register
 class GetLocal(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'lcl:Local@[backedge]'
+    __schema__ = 'loc:int lcl:Local@[backedge]'
 
 
 @register

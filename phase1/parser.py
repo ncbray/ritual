@@ -54,7 +54,8 @@ rule('match_expr_atom', r"""l = loc();
     | MatchValue(l, StringLiteral(l, string_value()))
     | $"!"; S(); Lookahead(l, match_expr_atom(), true)
     | $"loc"; Location(l)
-    | Call(Get(ident()),[])
+    | t=name_ref(); S(); $"{"; S(); args=struct_literal_match_args(); S(); $"}"; StructLiteral(l, t, args)
+    | Call(loc(), Get(ident()),[])
     )""")
 rule('match_expr_repeat', r"""e=match_expr_atom();
     (e=(
@@ -68,6 +69,12 @@ rule('match_expr_assign', r"""name=ident(); S(); ($"="; S(); Set(match_expr_repe
 rule('match_expr_sequence', r"""e=match_expr_assign(); (es =[e]; (S(); es<<match_expr_assign())+; e=Sequence(es))?; e""")
 rule('match_expr_choice', r"""e=match_expr_sequence(); (es =[e]; (S(); $"|"; S(); es<<match_expr_sequence())+; e=Choice(es))?; e""")
 rule('match_expr', r"""match_expr_choice()""")
+# TODO parameterized
+rule('struct_literal_match_args', r"""args = []; (
+    args << match_expr();
+    (S(); $","; S(); args << match_expr())*
+)?;
+args""")
 rule('struct_literal_args', r"""args = []; (
     args << expr();
     (S(); $","; S(); args << expr())*
@@ -89,7 +96,7 @@ rule('expr_atom', r"""l=loc();
     )""")
 rule('expr_call', r"""e = expr_atom();
 (
-    S(); $"("; args=[];
+    S(); l=loc(); $"("; args=[];
     (
         S(); args<<expr();
         (
@@ -99,7 +106,7 @@ rule('expr_call', r"""e = expr_atom();
             args<<expr()
         )*
     )?;
-    S(); $")"; e=Call(e, args)
+    S(); $")"; e=Call(l, e, args)
 )*;
 e""")
 rule('expr_repeat', r"""e=expr_call();
@@ -126,7 +133,7 @@ attrs""")
 rule('optional_attributes', r"""attributes()|[]""")
 rule('rule_decl', r"""attrs=optional_attributes(); S(); $"func"; end_of_keyword(); S(); name=ident(); S();
 params=param_list(); S(); $":"; S(); rt=type_ref(); S();
-$"{"; S(); body=expr(); S(); $"}";
+$"{"; S(); body=(expr()|Sequence([])); S(); $"}";
 RuleDecl(name, params, rt, body, attrs)""")
 
 rule('field_decl', r"""name=ident(); S(); $":"; S(); FieldDecl(name, type_ref())""")
