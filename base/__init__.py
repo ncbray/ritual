@@ -156,22 +156,23 @@ python_types = {
 }
 
 
-def zero_value(t):
+def zero_value(f):
+    t = f.t
     if isinstance(t, NamedType):
         if t.name == 'string':
-            return ''
+            return repr('')
         elif t.name == 'rune':
-            return '\0'
+            return repr('\0')
         elif t.name == 'bool':
-            return False
+            return repr(False)
         elif t.name == 'int':
-            return 0
+            return repr(0)
         else:
-            return None
+            return repr(None)
     elif isinstance(t, ListType):
         return []
     elif isinstance(t, NullableType):
-        return None
+        return repr(None)
     else:
         assert False, t
 
@@ -202,6 +203,10 @@ def gen_validation(fn, ft, indent):
     return src
 
 
+def init_with_arg(f):
+    return 'no_init' not in f.attrs and 'simple_init' not in f.attrs
+
+
 class TreeMeta(type):
     def __new__(cls, name, parents, dct):
         assert '__schema__' in dct, dct
@@ -216,18 +221,22 @@ class TreeMeta(type):
 
         src = ''
         if '__init__' not in dct:
-            args = ['self'] + [f.name for f in fields if 'no_init' not in f.attrs]
+            args = ['self'] + [f.name for f in fields if init_with_arg(f)]
             src += '\n'
             src += 'def __init__(%s):\n' % ', '.join(args)
             if fields:
                 for f in fields:
-                    if 'no_init' not in f.attrs:
+                    if init_with_arg(f):
                         src += gen_validation(f.name, f.t, '  ')
                 for f in fields:
-                    if 'no_init' not in f.attrs:
+                    if init_with_arg(f):
                         value = f.name
+                    elif 'no_init' in f.attrs:
+                        value = zero_value(f)
+                    elif 'simple_init' in f.attrs:
+                        value = f.t.name + '()'
                     else:
-                        value = repr(zero_value(f.t))
+                        assert False, f.attrs
                     src += '  self.%s = %s\n' % (f.name, value)
             else:
                 src += '  pass\n'
