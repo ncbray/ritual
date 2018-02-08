@@ -169,8 +169,9 @@ rule('file', r"""decls = []; (S(); decls << (rule_decl()|extern_decl()|struct_de
 
 
 def compile_src(name, text):
-    status = interpreter.location.CompileStatus(text)
-    result = p.parse('file', [], text)
+    status = interpreter.location.CompileStatus()
+    loc = status.add_source(name, text)
+    result = p.parse('file', [], text, loc)
     assert result.ok, result.error_message()
     f = result.value
     semantic.process(f, status)

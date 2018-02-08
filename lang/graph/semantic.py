@@ -120,8 +120,10 @@ class ResolveTypes(object):
         return model.Program(structs, edges)
 
 
-def process_file(src, f):
-    status = interpreter.location.CompileStatus(src)
+def process_file(name, src, f):
+    status = interpreter.location.CompileStatus()
+    loc = status.add_source(name, src)
+    # TODO link to parser.
     semantic = SemanticPass(status)
     IndexGlobals.visit(f, semantic)
     semantic.status.halt_if_errors()

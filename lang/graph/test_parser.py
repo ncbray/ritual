@@ -29,8 +29,9 @@ edge Def {
     scalar Value definition;
 }
 """
+        name = 'test'
         result = self.p_ok('file', src)
-        py_src = semantic.process_file(src, result)
+        py_src = semantic.process_file(name, src, result)
         #print py_src
         out = {}
-        semantic.compile_source('test', py_src, out)
+        semantic.compile_source(name, py_src, out)

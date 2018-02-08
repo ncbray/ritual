@@ -3,10 +3,10 @@ import base
 
 class LocationInfo(object):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'line:int column:int character:string text:string arrow:string'
+    __schema__ = 'filename:string line:int column:int character:string text:string arrow:string'
 
 
-def extractLocationInfo(stream, pos):
+def extractLocationInfo(filename, stream, pos):
     line = 1
     line_start = 0
     tabs = 0
@@ -30,20 +30,33 @@ def extractLocationInfo(stream, pos):
     else:
         c = '<EOS>'
 
-    return LocationInfo(line, col, c, text, ' '*col + '^')
+    return LocationInfo(filename, line, col, c, text, ' '*col + '^')
 
 
 class CompileStatus(object):
-    def __init__(self, text):
-        self.text = text
+    def __init__(self):
+        self.sources = []
+        self.loc = 0
         self.errors = 0
+
+    def add_source(self, filename, text):
+        loc = self.loc
+        self.loc += len(text) + 1 # For EOF
+        self.sources.append((loc, self.loc, filename, text))
+        return loc
+
+    def extract_location_info(self, loc):
+        for begin, end, filename, text in self.sources:
+            if begin <= loc and loc < end:
+                return extractLocationInfo(filename, text, loc - begin)
+        assert False, loc
 
     def error(self, msg, loc=None):
         if loc is None:
-            print 'ERROR %s' % msg
+            print 'error: %s' % msg
         else:
-            info = extractLocationInfo(self.text, loc)
-            print 'ERROR %d:%d: %s\n%s\n%s' % (info.line, info.column, msg, info.text, info.arrow)
+            info = self.extract_location_info(loc)
+            print '%s:%d:%d: error: %s\n%s\n%s' % (info.filename, info.line, info.column, msg, info.text, info.arrow)
         self.errors += 1
 
     def halt_if_errors(self):

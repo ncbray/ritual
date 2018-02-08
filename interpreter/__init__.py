@@ -283,7 +283,7 @@ class Location(Matcher):
     __schema__ = ''
 
     def match(self, parser):
-        return parser.pos
+        return parser.pos + parser.pos_offset
 
 
 class Param(object):
@@ -400,10 +400,12 @@ class Parser(object):
         info = location.extractLocationInfo(self.stream, self.deepest)
         return '%d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.deepest_name, info.text, info.arrow)
 
-    def parse(self, name, args, text, must_consume_everything=False):
+    def parse(self, name, args, text, loc=0, must_consume_everything=False):
         assert isinstance(name, basestring), type(name)
         assert isinstance(text, basestring), type(text)
+        assert isinstance(loc, int), type(loc)
         self.stream = text
+        self.pos_offset = loc
         self.pos = 0
         self.deepest = 0
         self.deepest_name = '<EOS>'
@@ -419,5 +421,5 @@ class Parser(object):
             result = None
             pos = 0
             error_scope = self.deepest_name
-            info = location.extractLocationInfo(self.stream, self.deepest)
+            info = location.extractLocationInfo(name, self.stream, self.deepest)
         return ParseResult(result, pos, self.ok, error_scope, info)
