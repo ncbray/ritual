@@ -33,6 +33,10 @@ def extractLocationInfo(filename, stream, pos):
     return LocationInfo(filename, line, col, c, text, ' '*col + '^')
 
 
+class HaltCompilation(Exception):
+    pass
+
+
 class CompileStatus(object):
     def __init__(self):
         self.sources = []
@@ -61,4 +65,4 @@ class CompileStatus(object):
 
     def halt_if_errors(self):
         if self.errors:
-            raise Exception('Halting due to errors.')
+            raise HaltCompilation('Halting due to errors.')

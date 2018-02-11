@@ -44,7 +44,7 @@ class Call(Matcher):
 
 class DirectCall(Matcher):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'func:CallableType@[backedge] args:[]Matcher'
+    __schema__ = 'loc:int func:CallableType@[backedge] args:[]Matcher'
 
 
 @register

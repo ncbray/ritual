@@ -148,8 +148,8 @@ class GetLoc(object):
     def visitGet(cls, node):
         return node.name.loc
 
-    @dispatch(model.GetLocal)
-    def visitGetLocal(cls, node):
+    @dispatch(model.GetLocal, model.DirectCall)
+    def visitEmbedded(cls, node):
         return node.loc
 
     @dispatch(model.Sequence, model.Choice)
@@ -385,7 +385,7 @@ class CheckRules(object):
         node.args, args = cls.visitArgs(node.args, semantic)
 
         if isinstance(expr, model.CallableType):
-            node = model.DirectCall(expr, node.args)
+            node = model.DirectCall(GetLoc.visit(node.expr), expr, node.args)
         else:
             if not isinstance(expr, model.PoisonType):
                 semantic.status.error('Cannot call %r' % (expr,), node.loc)

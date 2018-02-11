@@ -254,7 +254,7 @@ class TreeMeta(type):
             args = ['type(self).__name__']
             pat = []
             for f in fields:
-                if 'no_init' in f.attrs:
+                if not init_with_arg(f):
                     continue
                 elif 'backedge' in f.attrs:
                     pat.append('...')

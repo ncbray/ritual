@@ -337,7 +337,7 @@ def registerInterpreterTypes(p):
 @register
 class ParseResult(object):
     __metaclass__ = base.TreeMeta
-    __schema__ = 'value:* pos:int ok:bool error_scope:?string error_location:?location.LocationInfo'
+    __schema__ = 'value:* pos:int ok:bool error_scope:?string error_location:?location.LocationInfo loc:int'
 
     def error_message(self):
         assert not self.ok
@@ -422,4 +422,4 @@ class Parser(object):
             pos = 0
             error_scope = self.deepest_name
             info = location.extractLocationInfo(name, self.stream, self.deepest)
-        return ParseResult(result, pos, self.ok, error_scope, info)
+        return ParseResult(result, pos, self.ok, error_scope, info, self.deepest + loc)

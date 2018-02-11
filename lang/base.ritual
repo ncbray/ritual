@@ -7,6 +7,10 @@ func end_of_keyword():void {
     /![a-zA-Z_0-9]/
 }
 
+func raw_ident():string {
+    </[a-zA-Z_][a-zA-Z_0-9]*/>
+}
+
 func ident():Token {
-    Token{loc(), </[a-zA-Z_][a-zA-Z_0-9]*/>}
+    Token{loc(), raw_ident()}
 }
