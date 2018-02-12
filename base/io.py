@@ -26,11 +26,13 @@ class TabbedWriter(object):
         #assert not self.dirty
         self.indent_level += 1
         self.indent_text = self.indent_level * '    '
+        return self
 
     def dedent(self):
         # Can't check dirty because this may be an exception.
         self.indent_level -= 1
         self.indent_text = self.indent_level * '    '
+        return self
 
     def block(self, if_empty=None):
         return Block(self, if_empty)
@@ -41,7 +43,7 @@ class TabbedWriter(object):
             self.buffer += l
             eol = l.endswith('\n')
             if not eol:
-                return
+                return self
             b = self.buffer.rstrip()
             self.buffer = ''
             if b:
@@ -49,3 +51,4 @@ class TabbedWriter(object):
                 self.out.write(b)
                 self.pos += 1
             self.out.write('\n')
+        return self
