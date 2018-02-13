@@ -148,7 +148,7 @@ class GetLoc(object):
     def visitGet(cls, node):
         return node.name.loc
 
-    @dispatch(model.GetLocal, model.DirectCall)
+    @dispatch(model.GetLocal, model.DirectCall, model.DirectRef)
     def visitEmbedded(cls, node):
         return node.loc
 
@@ -208,7 +208,7 @@ class CheckSignatures(object):
         for f in node.fields:
             ft =  ResolveType.visit(f.t, semantic)
             nt.fields.append(model.Field(f.name.text, ft))
-            f.t = model.DirectRef(ft)
+            f.t = model.DirectRef(GetLoc.visit(f.t), ft)
 
     @dispatch(model.UnionDecl)
     def visitUnionDecl(cls, node, semantic):
@@ -218,7 +218,7 @@ class CheckSignatures(object):
             t = ResolveType.visit(r, semantic)
             t.unions.append(nt)
             types.append(t)
-            node.refs[i] = model.DirectRef(t)
+            node.refs[i] = model.DirectRef(GetLoc.visit(r), t)
         nt.types = types
 
     @dispatch(model.ExternDecl)
@@ -228,12 +228,12 @@ class CheckSignatures(object):
         params = []
         for p in node.params:
             t = ResolveType.visit(p.t, semantic)
-            p.t = model.DirectRef(t)
+            p.t = model.DirectRef(GetLoc.visit(p.t), t)
             params.append(t)
         nt.params = params
 
         rt = ResolveType.visit(node.rt, semantic)
-        node.rt = model.DirectRef(rt)
+        node.rt = model.DirectRef(GetLoc.visit(node.rt), rt)
         nt.rt = rt
 
     @dispatch(model.RuleDecl)
@@ -243,12 +243,12 @@ class CheckSignatures(object):
         params = []
         for p in node.params:
             t = ResolveType.visit(p.t, semantic)
-            p.t = model.DirectRef(t)
+            p.t = model.DirectRef(GetLoc.visit(p.t), t)
             params.append(t)
         nt.params = params
 
         rt = ResolveType.visit(node.rt, semantic)
-        node.rt = model.DirectRef(rt)
+        node.rt = model.DirectRef(GetLoc.visit(node.rt), rt)
         nt.rt = rt
 
 
@@ -404,7 +404,7 @@ class CheckRules(object):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         st = ResolveType.visit(node.t, semantic)
-        node.t = model.DirectRef(st)
+        node.t = model.DirectRef(GetLoc.visit(node.t), st)
         node.args, args = cls.visitArgs(node.args, semantic)
 
         if not isinstance(st, model.StructType):
@@ -424,7 +424,7 @@ class CheckRules(object):
         if not value_used:
             semantic.status.error('Unused literal.', node.loc)
         t = ResolveType.visit(node.t, semantic)
-        node.t = model.DirectRef(t)
+        node.t = model.DirectRef(GetLoc.visit(node.t), t)
 
         node.args, args = cls.visitArgs(node.args, semantic)
         lt = cached_list_type(node.t, t, semantic)

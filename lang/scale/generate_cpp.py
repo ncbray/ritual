@@ -61,6 +61,7 @@ def gen_params(params, gen):
         gen.out.write(', ')
         gen_param(p, gen)
 
+
 class GenerateDeclarations(object):
     __metaclass__ = TypeDispatcher
 
@@ -70,6 +71,19 @@ class GenerateDeclarations(object):
         gen.out.write(' ').write(gen.get_name(node)).write('(')
         gen_params(node.params, gen)
         gen.out.write(');\n')
+
+
+class GenerateTarget(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(model.SetLocal)
+    def visitSetLocal(cls, node, gen):
+        return node.lcl.name
+
+    @dispatch(model.DestructureTuple)
+    def visitDestructureTuple(cls, node, gen):
+        tgts = [cls.visit(tgt, gen) for tgt in node.args]
+        return 'std::tie(%s)' % ', '.join(tgts)
 
 
 class GenerateExpr(object):
@@ -95,6 +109,20 @@ class GenerateExpr(object):
     def visitGetLocal(cls, node, used, gen):
         return node.lcl.name
 
+    @dispatch(model.Sequence)
+    def visitSeqeunce(cls, node, used, gen):
+        for i, child in enumerate(node.children):
+            text = cls.visit(child, False, gen)
+            if i < len(node.children) - 1:
+                gen.out.write(text).write(';\n')
+            else:
+                return text
+
+    @dispatch(model.Assign)
+    def visitAssign(cls, node, used, gen):
+        target = GenerateTarget.visit(node.target, gen)
+        value = cls.visit(node.value, True, gen)
+        return target + ' = ' + value
 
 class GenerateSource(object):
     __metaclass__ = TypeDispatcher
@@ -107,6 +135,13 @@ class GenerateSource(object):
         gen_params(node.params, gen)
         gen.out.write(') {\n')
         with gen.out.block():
+            params = set([p.lcl for p in node.params])
+            for lcl in node.locals:
+                if lcl in params:
+                    continue
+                GenerateTypeRef.visit(lcl.t, gen)
+                gen.out.write(' ').write(lcl.name).write(';\n')
+
             expr = GenerateExpr.visit(node.body, True, gen)
             gen.out.write('return ' + expr + ';\n')
         gen.out.write('}\n')

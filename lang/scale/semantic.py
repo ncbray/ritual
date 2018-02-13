@@ -5,22 +5,26 @@ import model
 import parser
 
 POISON_EXPR = model.PoisonExpr()
+POISON_TARGET = model.PoisonTarget()
 
 POISON_TYPE = model.PoisonType()
 MODULE_TYPE = model.ModuleType()
+VOID_TYPE = model.TupleType([])
 
 
 class NamespaceScope(object):
+    __slots__ = ['semantic', 'namespace']
+
     def __init__(self, semantic, namespace):
         self.semantic = semantic
         self.namespace = namespace
 
     def __enter__(self):
-        self.semantic.namespaces.insert(0, self.namespace)
+        self.semantic._namespaces.insert(0, self.namespace)
 
     def __exit__(self, type, value, traceback):
-        ns = self.semantic.namespaces.pop(0)
-        assert ns == self.namespace
+        old = self.semantic._namespaces.pop(0)
+        assert old is self.namespace, old
 
 
 class SemanticPass(object):
@@ -28,13 +32,13 @@ class SemanticPass(object):
         self.status = status
         self.modules = OrderedDict()
         self.builtins = OrderedDict()
-        self.namespaces = [self.builtins]
+        self._namespaces = [self.builtins]
 
         self.tuple_cache = {}
         self.func_cache = {}
 
     def lookup(self, name):
-        for ns in self.namespaces:
+        for ns in self._namespaces:
             if name in ns:
                 return ns[name]
         return None
@@ -42,9 +46,29 @@ class SemanticPass(object):
     def namespace(self, ns):
         return NamespaceScope(self, ns)
 
+    def register(self, loc, name, obj):
+        for i, ns in enumerate(self._namespaces):
+            if name in ns:
+                if i == 0:
+                    semantic.status.error('tried to redefine "%s"' % name, loc)
+                else:
+                    semantic.status.error('"%s" shadows an existing name' % name, loc)
+                # TODO Poison?
+                return False
+        self._namespaces[0][name] = obj
+        return True
+
+    def define_lcl(self, loc, name, t):
+        lcl = model.Local(loc, name, t)
+        self.register(loc, name, lcl)
+        self.func.locals.append(lcl)
+        return lcl
+
 
 def make_tuple_type(children, semantic):
-    if len(children) == 1:
+    if len(children) == 0:
+        return VOID_TYPE
+    elif len(children) == 1:
         return children[0]
     key = tuple(children)
     t = semantic.tuple_cache.get(key)
@@ -143,11 +167,7 @@ class ResolveSignatures(object):
             name = p.name.text
             t = ResolveType.visit(p.t, semantic)
             pt.append(t)
-            lcl = model.Local(loc, name, t)
-            f.locals.append(lcl)
-            p = model.Param(name, t)
-            p.lcl = lcl
-            f.params.append(p)
+            f.params.append(model.Param(loc, name, t))
 
         rt = []
         for r in node.returns:
@@ -164,7 +184,7 @@ class ResolveSignatures(object):
             name = p.name.text
             t = ResolveType.visit(p.t, semantic)
             pt.append(t)
-            p = model.Param(name, t)
+            p = model.Param(loc, name, t)
             f.params.append(p)
 
         rt = []
@@ -232,6 +252,49 @@ def check_can_hold(loc, a, b, semantic):
     if not ok:
         semantic.status.error('expected type %s, but got %s' % (PrintableTypeName.visit(a), PrintableTypeName.visit(b)), loc)
     return ok
+
+
+class ResolveAssignmentTarget(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.GetName)
+    def visitGetName(cls, node, value_type, is_let, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        if is_let:
+            lcl = semantic.define_lcl(loc, name, value_type)
+            if not lcl:
+                return POISON_TARGET
+            return model.SetLocal(loc, lcl)
+        else:
+            assert False, node
+
+    @dispatch(parser.Let)
+    def visitLet(cls, node, value_type, is_let, semantic):
+        if is_let:
+            semantic.status.error('redundant let', node.loc)
+        return cls.visit(node.expr, value_type, True, semantic)
+
+    @dispatch(parser.TupleLiteral)
+    def visitTupleLiteral(cls, node, value_type, is_let, semantic):
+        loc = node.loc
+        ok = False
+        if isinstance(value_type, model.PoisonType):
+            pass
+        elif not isinstance(value_type, model.TupleType):
+            semantic.status.error('expected tuple, but got %s' % (PrintableTypeName.visit(value_type)), loc)
+        elif len(node.args) != len(value_type.children):
+            semantic.status.error('expected tuple of length %d, but got %d' % (len(node.args), len(value_type.children)), loc)
+        else:
+            ok = True
+
+        args = []
+        for i in range(len(node.args)):
+            arg = node.args[i]
+            arg_t = value_type.children[i] if ok else POISON_TYPE
+            args.append(cls.visit(arg, arg_t, is_let, semantic))
+
+        return model.DestructureTuple(loc, args)
 
 class ResolveCode(object):
     __metaclass__ = TypeDispatcher
@@ -321,23 +384,44 @@ class ResolveCode(object):
         t = make_tuple_type(arg_types, semantic)
         return model.TupleLiteral(node.loc, t, arg_exprs), t
 
+    @dispatch(parser.Assign)
+    def visitAssign(cls, node, used, semantic):
+        value, vt = cls.visit(node.value, True, semantic)
+        target = ResolveAssignmentTarget.visit(node.target, vt, False, semantic)
+        return model.Assign(node.loc, target, value), VOID_TYPE
+
+    @dispatch(parser.Sequence)
+    def visitSequence(cls, node, used, semantic):
+        children = []
+        if node.children:
+            for child in node.children[:-1]:
+                child, _ = cls.visit(child, False, semantic)
+                children.append(child)
+            child, t = cls.visit(node.children[-1], True, semantic)
+            children.append(child)
+        else:
+            t = VOID_TYPE
+        # HACK
+        loc = children[-1].loc if children else -1
+        return model.Sequence(loc, children), t
+
+
     @dispatch(parser.FuncDecl)
     def visitFuncDecl(cls, node, module, semantic):
         f = module.namespace[node.name.text]
         ns = OrderedDict()
-
-        for p in f.params:
-            lcl = p.lcl
-            loc = lcl.loc
-            name = lcl.name
-            register(loc, name, lcl, ns, semantic)
-
-        used = True
+        semantic.func = f
         with semantic.namespace(ns):
+            for p in f.params:
+                p.lcl = semantic.define_lcl(p.loc, p.name, p.t)
+
+            used = True
             f.body, t = cls.visit(node.body, used, semantic)
 
-        # TODO: break down tuple checks.
-        check_can_hold(f.body.loc, f.t.rt, t, semantic)
+            # TODO: break down tuple checks.
+            check_can_hold(f.body.loc, f.t.rt, t, semantic)
+
+        semantic.func = None
 
     @dispatch(parser.ExternFuncDecl)
     def visitExternFuncDecl(cls, node, module, semantic):

@@ -26,7 +26,23 @@ struct IntLiteral {
     base:int
 }
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral;
+struct Assign {
+    loc:location
+    target:Expr
+    value:Expr
+}
+
+struct Let {
+    loc:location
+    expr:Expr
+}
+
+struct Sequence {
+    children:[]Expr
+}
+
+
+union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | Assign | Let | Sequence;
 
 struct NamedTypeRef {
     name:Token
@@ -93,6 +109,7 @@ func expr_atom():Expr {
         | /")"/; TupleLiteral{l, []Expr{}}
         )
     | int_literal()
+    | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
     | GetName{ident()}
     )
 }
@@ -105,8 +122,31 @@ func expr_postfix():Expr {
     e
 }
 
+func expr_assign():Expr {
+    e=expr_postfix();
+    (
+        /S l=loc "=" S/;
+        value=expr_postfix();
+        e=Assign{l, e, value}
+    )?;
+    e
+}
+
+func expr_sequence():Expr {
+    e=expr_assign();
+    (
+        exprs=[]Expr{e};
+        (
+            /S ";" S/;
+            exprs<<expr_assign()
+        )+;
+        e=Sequence{exprs}
+    )?;
+    e
+}
+
 func expr():Expr {
-    expr_postfix()
+    expr_sequence()
 }
 
 func type_ref():TypeRef {

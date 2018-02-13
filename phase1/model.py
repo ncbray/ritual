@@ -173,7 +173,7 @@ class ListRef(TypeRef):
 
 class DirectRef(TypeRef):
     __metaclass__ = base.TreeMeta
-    __schema__ = 't:Type@[backedge]'
+    __schema__ = 'loc:int t:Type@[backedge]'
 
 
 class Decl(object):

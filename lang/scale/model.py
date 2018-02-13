@@ -65,17 +65,45 @@ class IntLiteral(object):
     __schema__ = 'loc:int value:int'
 
 
+class Assign(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int target:Target value:Expr'
+
+
+class Sequence(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int children:[]Expr'
+
+
 class PoisonExpr(object):
     __metaclass__ = TreeMeta
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, Assign, Sequence, PoisonExpr)
+
+
+class SetLocal(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int lcl:Local@[backedge]'
+
+
+class DestructureTuple(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int args:[]Target'
+
+
+class PoisonTarget(object):
+    __metaclass__ = TreeMeta
+    __schema__ = ''
+
+
+Target = (SetLocal, DestructureTuple, PoisonTarget)
 
 
 class Param(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'name:string t:Type lcl:Local@[no_init]'
+    __schema__ = 'loc:int name:string t:Type lcl:Local@[no_init]'
 
 
 class Local(object):
