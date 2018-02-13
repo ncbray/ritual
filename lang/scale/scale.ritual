@@ -1,0 +1,173 @@
+
+struct GetName {
+    name:Token
+}
+
+struct GetAttr {
+    loc:location
+    expr:Expr
+    name:Token
+}
+
+struct Call {
+    loc:location
+    expr:Expr
+    args:[]Expr
+}
+
+struct TupleLiteral {
+    loc:location
+    args:[]Expr
+}
+
+struct IntLiteral {
+    loc:location
+    text:string
+    base:int
+}
+
+union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral;
+
+struct NamedTypeRef {
+    name:Token
+}
+
+struct ListTypeRef {
+    t:TypeRef
+}
+
+union TypeRef = NamedTypeRef | ListTypeRef;
+
+
+struct Param {
+    name:Token
+    t:TypeRef
+}
+
+struct FuncDecl {
+    name:Token
+    params:[]Param
+    returns:[]TypeRef
+    body:Expr
+}
+
+struct ImportDecl {
+    loc:location
+    path:[]string
+}
+
+struct ExternFuncDecl {
+    name:Token
+    params:[]Param
+    returns:[]TypeRef
+}
+
+union Decl = FuncDecl | ImportDecl | ExternFuncDecl;
+
+struct Module {
+    name:string
+    path:string
+    decls:[]Decl
+}
+
+func S():void {
+    /([ \t\n\r]|"//"[^\n]*)*/
+}
+
+//func s():void { /[ \t]*/ }
+//func EOS():void { /S ";" | s !!"}" | S [^]/ }
+
+func int_literal():IntLiteral {
+    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
+}
+
+func expr_atom():Expr {
+    (/l=loc "(" S/; 
+        (e=expr();
+            (args=[]Expr{e};
+                /(S "," S args<<expr)+/;
+                /S ")"/;
+                TupleLiteral{l, args}
+            | e
+            )
+        | /")"/; TupleLiteral{l, []Expr{}}
+        )
+    | int_literal()
+    | GetName{ident()}
+    )
+}
+
+func expr_postfix():Expr {
+    e=expr_atom();
+    ( /S l=loc "." S/; e=GetAttr{l, e, ident()}
+    | /S l=loc "(" S/; args=[]Expr{}; /(args<<expr (S "," S args<<expr)*)? S ")"/; e=Call{l, e, args}
+    )*;
+    e
+}
+
+func expr():Expr {
+    expr_postfix()
+}
+
+func type_ref():TypeRef {
+    NamedTypeRef{ident()}
+    | /"[]" S/; ListTypeRef{type_ref()}
+}
+
+func func_param():Param {
+    /name=ident S ":" S t=type_ref/; Param{name, t}
+}
+
+func func_params():[]Param {
+    /"(" S/;
+    params = []Param{};
+    (
+        params<<func_param();
+        (
+            /S "," S/;
+            params<<func_param()
+        )*
+    )?;
+    /S ")"/;
+    params
+}
+
+func func_returns():[]TypeRef {
+    types=[]TypeRef{};
+    (
+        /"->" S (types<<type_ref | "(" S (types<<type_ref (S "," S types<<type_ref)*)? S ")")/
+    )?;
+    types
+}
+
+func func_decl():FuncDecl {
+    /"fn" end_of_keyword S name=ident S params=func_params S returns=func_returns S "{" S/;
+    /body=expr/;
+    /S "}"/;
+    FuncDecl{name, params, returns, body}
+}
+
+func import_decl():ImportDecl {
+    /"import" end_of_keyword S/;
+    l = loc();
+    path = []string{raw_ident()};
+    /("." path<<raw_ident)* S ";"/;
+    ImportDecl{l, path}
+}
+
+func extern_func_decl():ExternFuncDecl {
+    /"extern" end_of_keyword S "fn" end_of_keyword S name=ident S params=func_params S returns=func_returns S ";"/;
+    ExternFuncDecl{name, params, returns}
+}
+
+[export]
+func module(module_name:string, path:string):Module {
+    decls = []Decl{};
+    (
+        S();
+        decls<<(func_decl()|import_decl()|extern_func_decl())
+    )*;
+    S();
+    /![^]/;
+    Module{module_name, path, decls}
+}

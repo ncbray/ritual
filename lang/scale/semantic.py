@@ -1,0 +1,383 @@
+from base import TypeDispatcher, dispatch
+from collections import OrderedDict
+import interpreter.location
+import model
+import parser
+
+POISON_EXPR = model.PoisonExpr()
+
+POISON_TYPE = model.PoisonType()
+MODULE_TYPE = model.ModuleType()
+
+
+class NamespaceScope(object):
+    def __init__(self, semantic, namespace):
+        self.semantic = semantic
+        self.namespace = namespace
+
+    def __enter__(self):
+        self.semantic.namespaces.insert(0, self.namespace)
+
+    def __exit__(self, type, value, traceback):
+        ns = self.semantic.namespaces.pop(0)
+        assert ns == self.namespace
+
+
+class SemanticPass(object):
+    def __init__(self, status):
+        self.status = status
+        self.modules = OrderedDict()
+        self.builtins = OrderedDict()
+        self.namespaces = [self.builtins]
+
+        self.tuple_cache = {}
+        self.func_cache = {}
+
+    def lookup(self, name):
+        for ns in self.namespaces:
+            if name in ns:
+                return ns[name]
+        return None
+
+    def namespace(self, ns):
+        return NamespaceScope(self, ns)
+
+
+def make_tuple_type(children, semantic):
+    if len(children) == 1:
+        return children[0]
+    key = tuple(children)
+    t = semantic.tuple_cache.get(key)
+    if not t:
+        t = model.TupleType(children)
+        semantic.tuple_cache[key] = t
+    return t
+
+
+def make_function_type(params, returns, semantic):
+    rt = make_tuple_type(returns, semantic)
+    key = (tuple(params), rt)
+    t = semantic.func_cache.get(key)
+    if not t:
+        t = model.FunctionType(params, rt)
+        semantic.func_cache[key] = t
+    return t
+
+
+def register(loc, name, value, namespace, semantic):
+    if name in namespace:
+        semantic.status.error('tried to redefine "%s"' % name, loc)
+        return
+
+    if semantic.lookup(name) is not None:
+        semantic.status.error('"%s" shadows an existing name' % name, loc)
+        return
+
+    namespace[name] = value
+
+
+class IndexNamespace(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.ImportDecl)
+    def visitImportDecl(cls, node, module, semantic):
+        dotted = '.'.join(node.path)
+        register(node.loc, node.path[-1], semantic.modules[dotted], module.namespace, semantic)
+
+    @dispatch(parser.FuncDecl)
+    def visitFuncDecl(cls, node, module, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        f = model.Function(loc, name, module)
+        register(loc, name, f, module.namespace, semantic)
+        return f
+
+    @dispatch(parser.ExternFuncDecl)
+    def visitExternFuncDecl(cls, node, module, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        f = model.ExternFunction(loc, name, module)
+        register(loc, name, f, module.namespace, semantic)
+        return f
+
+    @dispatch(parser.Module)
+    def visitModule(cls, node, module, semantic):
+        funcs = []
+        for decl in node.decls:
+            f = cls.visit(decl, module, semantic)
+            if f:
+                funcs.append(f)
+        module.functions = funcs
+
+
+class ResolveType(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.NamedTypeRef)
+    def visitNamedTypeRef(self, node, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        obj = semantic.lookup(name)
+        if obj is None:
+            semantic.status.error('cannot resolve "%s"' % name, loc)
+            return POISON_TYPE
+        if not isinstance(obj, model.Type):
+            semantic.status.error('"%s" does not refer to a type' % name, loc)
+            return POISON_TYPE        
+        return obj
+
+
+class ResolveSignatures(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.ImportDecl)
+    def visitLeaf(cls, node, module, semantic):
+        pass
+
+    @dispatch(parser.FuncDecl)
+    def visitFuncDecl(cls, node, module, semantic):
+        f = module.namespace[node.name.text]
+        pt = []
+        for p in node.params:
+            loc = p.name.loc
+            name = p.name.text
+            t = ResolveType.visit(p.t, semantic)
+            pt.append(t)
+            lcl = model.Local(loc, name, t)
+            f.locals.append(lcl)
+            p = model.Param(name, t)
+            p.lcl = lcl
+            f.params.append(p)
+
+        rt = []
+        for r in node.returns:
+            t = ResolveType.visit(r, semantic)
+            rt.append(t)
+        f.t = make_function_type(pt, rt, semantic)
+
+    @dispatch(parser.ExternFuncDecl)
+    def visitExternFuncDecl(cls, node, module, semantic):
+        f = module.namespace[node.name.text]
+        pt = []
+        for p in node.params:
+            loc = p.name.loc
+            name = p.name.text
+            t = ResolveType.visit(p.t, semantic)
+            pt.append(t)
+            p = model.Param(name, t)
+            f.params.append(p)
+
+        rt = []
+        for r in node.returns:
+            t = ResolveType.visit(r, semantic)
+            rt.append(t)
+        f.t = make_function_type(pt, rt, semantic)
+
+    @dispatch(parser.Module)
+    def visitModule(cls, node, module, semantic):
+        with semantic.namespace(module.namespace):
+            for decl in node.decls:
+                cls.visit(decl, module, semantic)
+
+
+class PrintableTypeName(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(model.IntrinsicType)
+    def visitIntrinsicType(cls, node):
+        return node.name
+
+    @dispatch(model.TupleType)
+    def visitTupleType(cls, node):
+        return '(%s)' % ', '.join([cls.visit(arg) for arg in node.children])
+
+
+def wrap_obj(loc, obj):
+    if isinstance(obj, model.Local):
+        return model.GetLocal(loc, obj), obj.t
+    elif isinstance(obj, model.Type):
+        return model.GetType(loc, obj), obj
+    elif isinstance(obj, model.Function):
+        return model.GetFunction(loc, obj), obj.t
+    elif isinstance(obj, model.ExternFunction):
+        return model.GetFunction(loc, obj), obj.t
+    elif isinstance(obj, model.Module):
+        return model.GetModule(loc, obj), MODULE_TYPE
+    else:
+        assert False, obj
+
+
+def can_hold(a, b):
+    if a is b:
+        return True
+    if isinstance(a, model.PoisonType) or isinstance(b, model.PoisonType):
+        return True
+    if isinstance(a, model.IntrinsicType) and isinstance(b, model.IntrinsicType):
+        return a.name == b.name
+    if isinstance(a, model.TupleType) and isinstance(b, model.TupleType):
+        if len(a.children) != len(b.children):
+            return False
+        # TODO not quite right, should be checking exact equality.
+        for ac, bc in zip(a.children, b.children):
+            if not can_hold(ac, bc):
+                return False
+        return True
+    return False
+
+def check_can_hold(loc, a, b, semantic):
+    assert isinstance(loc, int), loc
+    assert isinstance(a, model.Type), a
+    assert isinstance(b, model.Type), b
+    ok = can_hold(a, b)
+    if not ok:
+        semantic.status.error('expected type %s, but got %s' % (PrintableTypeName.visit(a), PrintableTypeName.visit(b)), loc)
+    return ok
+
+class ResolveCode(object):
+    __metaclass__ = TypeDispatcher
+
+    @classmethod
+    def visit_expr_list(cls, exprs, semantic):
+        values = []
+        types = []
+        for e in exprs:
+            v, t = cls.visit(e, True, semantic)
+            values.append(v)
+            types.append(t)
+        return values, types
+
+    @dispatch(parser.ImportDecl)
+    def visitLeaf(cls, node, module, semantic):
+        pass
+
+    @dispatch(parser.IntLiteral)
+    def visitIntLiteral(cls, node, used, semantic):
+        loc = node.loc
+        # TODO error handling.
+        value = int(node.text, node.base)
+        # TODO flexible integer types?
+        return model.IntLiteral(loc, value), semantic.builtins['i32']
+
+    @dispatch(parser.GetName)
+    def visitGetName(cls, node, used, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        obj = semantic.lookup(name)
+        if obj is None:
+            semantic.status.error('cannot resolve "%s"' % name, loc)
+            return POISON_EXPR, POISON_TYPE
+        return wrap_obj(loc, obj)
+
+    @dispatch(parser.GetAttr)
+    def visitGetAttr(cls, node, used, semantic):
+        loc = node.loc
+        name = node.name.text        
+        expr, t = cls.visit(node.expr, True, semantic)
+        assert isinstance(t, model.Type), (node, expr, t)
+
+        if isinstance(t, model.PoisonType):
+            return POISON_EXPR, POISON_TYPE
+        elif isinstance(t, model.ModuleType):
+            m = expr.m
+            obj = m.namespace.get(name)
+            if obj is None:
+                semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+            return wrap_obj(loc, obj)
+        else:
+            semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+            return POISON_EXPR, POISON_TYPE
+
+    @dispatch(parser.Call)
+    def visitCall(cls, node, used, semantic):
+        loc = node.loc
+        expr, et = cls.visit(node.expr, True, semantic)
+        arg_exprs, arg_types = cls.visit_expr_list(node.args, semantic)
+        
+        if not isinstance(et, model.FunctionType):
+            semantic.status.error('cannot call %s' % (PrintableTypeName.visit(et)), loc)
+            return POISON_EXPR, POISON_TYPE
+
+        # TODO overloads?
+        arg_count = len(node.args)
+        params = et.params
+        if len(params) != arg_count:
+            semantic.status.error('expected %d arguments, got %d' % (len(params), arg_count, loc))
+            return POISON_EXPR, POISON_TYPE
+
+        for i in range(arg_count):
+            pt = et.params[i]
+            ae = arg_exprs[i]
+            at = arg_types[i]
+            check_can_hold(ae.loc, pt, at, semantic)
+
+        if isinstance(expr, model.GetFunction):
+            return model.DirectCall(loc, expr.f, arg_exprs), et.rt
+        else:
+            assert False, expr
+
+    @dispatch(parser.TupleLiteral)
+    def visitTupleLiteral(cls, node, used, semantic):
+        arg_exprs, arg_types = cls.visit_expr_list(node.args, semantic)
+        t = make_tuple_type(arg_types, semantic)
+        return model.TupleLiteral(node.loc, t, arg_exprs), t
+
+    @dispatch(parser.FuncDecl)
+    def visitFuncDecl(cls, node, module, semantic):
+        f = module.namespace[node.name.text]
+        ns = OrderedDict()
+
+        for p in f.params:
+            lcl = p.lcl
+            loc = lcl.loc
+            name = lcl.name
+            register(loc, name, lcl, ns, semantic)
+
+        used = True
+        with semantic.namespace(ns):
+            f.body, t = cls.visit(node.body, used, semantic)
+
+        # TODO: break down tuple checks.
+        check_can_hold(f.body.loc, f.t.rt, t, semantic)
+
+    @dispatch(parser.ExternFuncDecl)
+    def visitExternFuncDecl(cls, node, module, semantic):
+        pass
+
+    @dispatch(parser.Module)
+    def visitModule(cls, node, module, semantic):
+        with semantic.namespace(module.namespace):
+            for decl in node.decls:
+                cls.visit(decl, module, semantic)
+
+
+def process(modules, status):
+    semantic = SemanticPass(status)
+
+    ns = semantic.builtins
+    ns['i8'] = model.IntrinsicType('i8')
+    ns['i16'] = model.IntrinsicType('i16')
+    ns['i32'] = model.IntrinsicType('i32')
+
+    # Create objects
+    p = model.Program()
+    for m in modules:
+        module = model.Module(m.name)
+        semantic.modules[m.name] = module
+        p.modules.append(module)
+
+    for m in modules:
+        module = semantic.modules[m.name]
+        IndexNamespace.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    for m in modules:
+        module = semantic.modules[m.name]
+        ResolveSignatures.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    for m in modules:
+        module = semantic.modules[m.name]
+        ResolveCode.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    return p
