@@ -124,6 +124,26 @@ class GenerateExpr(object):
         value = cls.visit(node.value, True, gen)
         return target + ' = ' + value
 
+    @dispatch(model.BinaryOp)
+    def visitBinaryOp(cls, node, used, gen):
+        left = cls.visit(node.left, True, gen)
+        right = cls.visit(node.right, True, gen)
+        return '(%s %s %s)' % (left, node.op, right)
+
+    @dispatch(model.While)
+    def visitWhile(cls, node, used, gen):
+        gen.out.write('while (true) {\n')
+        with gen.out.block():
+            cond = cls.visit(node.cond, True, gen)
+            gen.out.write('if (!%s) break;\n' % cond)
+            body = cls.visit(node.body, False, gen)
+            gen.out.write(body + ';\n')
+        gen.out.write('}')
+
+        return '' # HACK
+
+
+
 class GenerateSource(object):
     __metaclass__ = TypeDispatcher
 

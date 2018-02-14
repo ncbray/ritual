@@ -75,12 +75,22 @@ class Sequence(object):
     __schema__ = 'loc:int children:[]Expr'
 
 
+class BinaryOp(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int left:Expr op:string right:Expr'
+
+
+class While(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int cond:Expr body:Expr'
+
+
 class PoisonExpr(object):
     __metaclass__ = TreeMeta
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, Assign, Sequence, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
 
 
 class SetLocal(object):

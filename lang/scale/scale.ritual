@@ -1,5 +1,6 @@
 
 struct GetName {
+    loc:location
     name:Token
 }
 
@@ -41,8 +42,20 @@ struct Sequence {
     children:[]Expr
 }
 
+struct While {
+    loc:location
+    cond:Expr
+    body:Expr
+}
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | Assign | Let | Sequence;
+struct BinaryOp {
+    loc:location
+    left:Expr
+    op:string
+    right:Expr
+}
+
+union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | Assign | Let | Sequence | While | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -110,7 +123,8 @@ func expr_atom():Expr {
         )
     | int_literal()
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
-    | GetName{ident()}
+    | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr S "}"/; While{l, cond, body}
+    | GetName{loc(), ident()}
     )
 }
 
@@ -122,11 +136,29 @@ func expr_postfix():Expr {
     e
 }
 
-func expr_assign():Expr {
+func expr_add():Expr {
     e=expr_postfix();
     (
+        /S l=loc op=<"+"|"-"> S other=expr_postfix/;
+        e = BinaryOp{l, e, op, other}
+    )*;
+    e
+}
+
+func expr_compare():Expr {
+    e=expr_add();
+    (
+        /S l=loc op=<"<="|"<"|">="|">"|"!="|"=="> S other=expr_add/;
+        e = BinaryOp{l, e, op, other}
+    )?;
+    e
+}
+
+func expr_assign():Expr {
+    e=expr_compare();
+    (
         /S l=loc "=" S/;
-        value=expr_postfix();
+        value=expr_compare();
         e=Assign{l, e, value}
     )?;
     e

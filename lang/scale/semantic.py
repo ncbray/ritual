@@ -308,6 +308,7 @@ class ResolveAssignmentTarget(object):
 
         return model.DestructureTuple(loc, args)
 
+
 class ResolveCode(object):
     __metaclass__ = TypeDispatcher
 
@@ -417,6 +418,26 @@ class ResolveCode(object):
         loc = children[-1].loc if children else -1
         return model.Sequence(loc, children), t
 
+    @dispatch(parser.BinaryOp)
+    def visitBinaryOp(cls, node, used, semantic):
+        loc = node.loc
+        l, lt = cls.visit(node.left, True, semantic)
+        r, rt = cls.visit(node.right, True, semantic)
+        # TODO better validation and checking.
+        check_can_hold(node.right.loc, lt, rt, semantic)
+        if node.op in set(['<=', '<', '>=', '>', '==', '!=']):
+            t = semantic.builtins['bool']
+        else:
+            t = lt
+        return model.BinaryOp(loc, l, node.op, r), t
+
+
+    @dispatch(parser.While)
+    def visitWhile(cls, node, used, semantic):
+        cond, ct = cls.visit(node.cond, True, semantic)
+        check_can_hold(node.cond.loc, semantic.builtins['bool'], ct, semantic)
+        body, _ = cls.visit(node.body, False, semantic)
+        return model.While(node.loc, cond, body), VOID_TYPE
 
     @dispatch(parser.FuncDecl)
     def visitFuncDecl(cls, node, module, semantic):
@@ -450,6 +471,7 @@ def process(modules, status):
     semantic = SemanticPass(status)
 
     ns = semantic.builtins
+    ns['bool'] = model.IntrinsicType('bool')
     ns['i8'] = model.IntrinsicType('i8')
     ns['i16'] = model.IntrinsicType('i16')
     ns['i32'] = model.IntrinsicType('i32')
