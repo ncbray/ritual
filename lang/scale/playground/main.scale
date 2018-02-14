@@ -7,7 +7,10 @@ fn swap(a:i32, b:i32) -> (i32, i32) {
 }
 
 fn main() {
-    (let a, let b) = swap(7, 13);
+    let a = 7;
+    let b = 13;
+    let i = 0;
+    (a, b) = swap(a, b);
     print_int(a);
     print_int(b)
 }

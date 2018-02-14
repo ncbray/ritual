@@ -267,7 +267,19 @@ class ResolveAssignmentTarget(object):
                 return POISON_TARGET
             return model.SetLocal(loc, lcl)
         else:
-            assert False, node
+            obj = semantic.lookup(name)
+            if obj is None:
+                semantic.status.error('cannot resolve "%s"' % name, loc)
+                return POISON_TARGET
+            if not isinstance(obj, model.Local):
+                # TODO metter naming?
+                semantic.status.error('cannot assign to %s' % type(obj).__name__, loc)
+                return POISON_TARGET
+            check_can_hold(loc, obj.t, value_type, semantic)
+            return model.SetLocal(loc, obj)
+
+
+            assert False, obj
 
     @dispatch(parser.Let)
     def visitLet(cls, node, value_type, is_let, semantic):
