@@ -104,7 +104,16 @@ escapes = {
 
 
 def escape_char(c):
-    return escapes.get(c) or (c if is_printable_ascii(c) else '\\x%02x' % ord(c))
+    if c in escapes:
+        return escapes[c]
+    elif is_printable_ascii(c):
+        return c
+    elif ord(c) < 256:
+        return '\\x%02x' % ord(c)
+    elif ord(c) < 65536:
+        return '\\u%04x' % ord(c)
+    else:
+        return '\\U%08x' % ord(c)
 
 
 def is_printable_ascii(c):
@@ -120,12 +129,9 @@ class GenerateExpr(object):
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, used, gen):
-        s = node.value
-        if isinstance(s, unicode):
-            s = s.encode('utf-8')
-        chars = [escape_char(c) for c in s]
+        chars = [escape_char(c) for c in node.value]
 
-        return '"' + ''.join(chars) + '"', False
+        return 'u8"' + ''.join(chars) + '"', False
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
