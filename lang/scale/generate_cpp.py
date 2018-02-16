@@ -24,8 +24,10 @@ class Generator(object):
 
 
 INTRINSIC_MAP = {}
+INTRINSIC_MAP['bool'] = 'bool'
 for sz in [8, 16, 32]:
     INTRINSIC_MAP['i%d' % sz] = 'int%d_t' % sz
+INTRINSIC_MAP['string'] = 'std::string'
 
 
 class GenerateTypeRef(object):
@@ -87,12 +89,43 @@ class GenerateTarget(object):
         return 'std::tie(%s)' % ', '.join(tgts)
 
 
+escapes = {
+    '\\': '\\\\',
+    '"': '\\"',
+    '\'': '\\\'',
+    '\n': '\\n',
+    '\r': '\\r',
+    '\t': '\\t',
+    '\f': '\\f',
+    '\a': '\\a',
+    '\v': '\\v',
+    '?': '\\?', # Because trigraphs.
+}
+
+
+def escape_char(c):
+    return escapes.get(c) or (c if is_printable_ascii(c) else '\\x%02x' % ord(c))
+
+
+def is_printable_ascii(c):
+    return 32 <= ord(c) < 127
+
+
 class GenerateExpr(object):
     __metaclass__ = TypeDispatcher
 
     @dispatch(model.IntLiteral)
     def visitIntLiteral(cls, node, used, gen):
         return repr(node.value), False
+
+    @dispatch(model.StringLiteral)
+    def visitStringLiteral(cls, node, used, gen):
+        s = node.value
+        if isinstance(s, unicode):
+            s = s.encode('utf-8')
+        chars = [escape_char(c) for c in s]
+
+        return '"' + ''.join(chars) + '"', False
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
@@ -156,6 +189,7 @@ def gen_arg(node, gen):
     else:
         return expr
 
+
 def gen_void(node, gen):
     expr, impure = GenerateExpr.visit(node, False, gen)
     if expr and impure:
@@ -197,7 +231,7 @@ class GenerateSource(object):
 
     @dispatch(model.Program)
     def visitProgram(cls, node, gen):
-        includes = ['cstdint', 'tuple']
+        includes = ['cstdint', 'tuple', 'string']
         includes.sort()
         for name in includes:
             gen.out.write('#include <%s>\n' % name)

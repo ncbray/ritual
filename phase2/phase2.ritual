@@ -147,7 +147,7 @@ func string_value():string {
     /["]/;
     c = []rune{};
     (
-        c << /escape_char | [\\]["] | [^"]/
+        c << /escape_char | [\\]["] | [^\\"]/
     )*;
     /["]/;
     chars_to_string(c)

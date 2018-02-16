@@ -334,6 +334,10 @@ class ResolveCode(object):
         # TODO flexible integer types?
         return model.IntLiteral(loc, value), semantic.builtins['i32']
 
+    @dispatch(parser.StringLiteral)
+    def visitStringLiteral(cls, node, used, semantic):
+        return model.StringLiteral(node.loc, node.value), semantic.builtins['string']
+
     @dispatch(parser.GetName)
     def visitGetName(cls, node, used, semantic):
         loc = node.name.loc
@@ -368,6 +372,9 @@ class ResolveCode(object):
         loc = node.loc
         expr, et = cls.visit(node.expr, True, semantic)
         arg_exprs, arg_types = cls.visit_expr_list(node.args, semantic)
+
+        if isinstance(et, model.PoisonType):
+            return POISON_EXPR, POISON_TYPE
         
         if not isinstance(et, model.FunctionType):
             semantic.status.error('cannot call %s' % (PrintableTypeName.visit(et)), loc)
@@ -475,6 +482,8 @@ def process(modules, status):
     ns['i8'] = model.IntrinsicType('i8')
     ns['i16'] = model.IntrinsicType('i16')
     ns['i32'] = model.IntrinsicType('i32')
+
+    ns['string'] = model.IntrinsicType('string')
 
     # Create objects
     p = model.Program()

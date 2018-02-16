@@ -1,3 +1,6 @@
+extern int_to_rune(i:int):rune
+extern runes_to_string(runes:[]rune):string
+extern string_to_int(text:string, base:int):int
 
 struct GetName {
     loc:location
@@ -25,6 +28,11 @@ struct IntLiteral {
     loc:location
     text:string
     base:int
+}
+
+struct StringLiteral {
+    loc:location
+    value:string
 }
 
 struct Assign {
@@ -55,7 +63,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | Assign | Let | Sequence | While | BinaryOp;
+union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -106,8 +114,38 @@ func S():void {
 //func s():void { /[ \t]*/ }
 //func EOS():void { /S ";" | s !!"}" | S [^]/ }
 
+func hex_digit():rune {
+    /[0-9a-fA-Z]/
+}
+
 func int_literal():IntLiteral {
     /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
+}
+
+func escape_char():rune {
+    /[\\]/;
+    ( /[n]/; int_to_rune(0x0A)
+    | /[r]/; int_to_rune(0x0D)
+    | /[t]/; int_to_rune(0x09)
+    | /[0]/; int_to_rune(0x00)
+    | /[\\]/; int_to_rune(0x5C)
+    | /[x]/; int_to_rune(string_to_int(</hex_digit hex_digit/>, 16))
+    | /[u][{] digits=<hex_digit+> [}]/; int_to_rune(string_to_int(digits, 16))
+    )
+}
+
+func string_value():string {
+    /["]/;
+    c = []rune{};
+    (
+        c << /escape_char | [\\]["] | [^\\"]/
+    )*;
+    /["]/;
+    runes_to_string(c)
+}
+
+func string_literal():StringLiteral {
+    StringLiteral{loc(), string_value()}
 }
 
 func expr_atom():Expr {
@@ -122,6 +160,7 @@ func expr_atom():Expr {
         | /")"/; TupleLiteral{l, []Expr{}}
         )
     | int_literal()
+    | string_literal()
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
     | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr S "}"/; While{l, cond, body}
     | GetName{loc(), ident()}

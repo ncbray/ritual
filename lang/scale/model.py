@@ -65,6 +65,11 @@ class IntLiteral(object):
     __schema__ = 'loc:int value:int'
 
 
+class StringLiteral(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int value:basestring'
+
+
 class Assign(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int target:Target value:Expr'
@@ -90,7 +95,7 @@ class PoisonExpr(object):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, StringLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
 
 
 class SetLocal(object):

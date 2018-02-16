@@ -20,7 +20,7 @@ FLAGS+=" -O1"
 #FLAGS+=" -O2 -flto"
 #FLAGS+=" -fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti -fno-math-errno -fmerge-all-constants -fno-ident"
 FLAGS+=" -fsanitize=address -fno-omit-frame-pointer"
-clang $FLAGS $OUTPUT_SRC libscale/runtime.cc -o $OUTPUT_BIN
+clang++ $FLAGS $OUTPUT_SRC libscale/runtime.cc -o $OUTPUT_BIN
 
 echo
 echo "=== Running ==="

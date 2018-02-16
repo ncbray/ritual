@@ -1,12 +1,14 @@
 import foo;
 
 extern fn print_int(value:i32);
+extern fn print_string(value:string);
 
 fn swap(a:i32, b:i32) -> (i32, i32) {
     (b, foo.passthrough(a))
 }
 
 fn main() {
+    print_string("Hello, world.\n");
     let a = 3;
     let b = 3;
     let i = 0;
