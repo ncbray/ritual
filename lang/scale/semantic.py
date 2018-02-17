@@ -116,6 +116,14 @@ class IndexNamespace(object):
         register(loc, name, f, module.namespace, semantic)
         return f
 
+    @dispatch(parser.StructDecl)
+    def visitStructDecl(cls, node, module, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        s = model.Struct(loc, name, module)
+        register(loc, name, s, module.namespace, semantic)
+        return s
+
     @dispatch(parser.ExternFuncDecl)
     def visitExternFuncDecl(cls, node, module, semantic):
         loc = node.name.loc
@@ -126,12 +134,25 @@ class IndexNamespace(object):
 
     @dispatch(parser.Module)
     def visitModule(cls, node, module, semantic):
+        structs = []
+        extern_funcs = []
         funcs = []
         for decl in node.decls:
-            f = cls.visit(decl, module, semantic)
-            if f:
-                funcs.append(f)
-        module.functions = funcs
+            obj = cls.visit(decl, module, semantic)
+            if obj is None:
+                pass
+            elif isinstance(obj, model.Struct):
+                structs.append(obj)
+            elif isinstance(obj, model.ExternFunction):
+                extern_funcs.append(obj)
+            elif isinstance(obj, model.Function):
+                funcs.append(obj)
+            else:
+                assert False, obj
+
+        module.structs = structs
+        module.extern_funcs = extern_funcs
+        module.funcs = funcs
 
 
 class ResolveType(object):
@@ -174,6 +195,21 @@ class ResolveSignatures(object):
             t = ResolveType.visit(r, semantic)
             rt.append(t)
         f.t = make_function_type(pt, rt, semantic)
+
+    @dispatch(parser.StructDecl)
+    def visitStructDecl(cls, node, module, semantic):
+        s = module.namespace[node.name.text]
+        namespace = OrderedDict()
+        fields = []
+        for fd in node.fields:
+            loc = fd.name.loc
+            name = fd.name.text
+            f = model.Field(loc, name, ResolveType.visit(fd.t, semantic))
+            fields.append(f)
+            if name in namespace:
+                semantic.status.error('tried to redefine "%s"' % name, loc)
+            namespace[name] = f
+        s.fields = fields
 
     @dispatch(parser.ExternFuncDecl)
     def visitExternFuncDecl(cls, node, module, semantic):
@@ -322,7 +358,7 @@ class ResolveCode(object):
             types.append(t)
         return values, types
 
-    @dispatch(parser.ImportDecl)
+    @dispatch(parser.ImportDecl, parser.StructDecl)
     def visitLeaf(cls, node, module, semantic):
         pass
 
@@ -482,6 +518,8 @@ def process(modules, status):
     ns['i8'] = model.IntrinsicType('i8')
     ns['i16'] = model.IntrinsicType('i16')
     ns['i32'] = model.IntrinsicType('i32')
+    ns['f32'] = model.IntrinsicType('f32')
+    ns['f64'] = model.IntrinsicType('f64')
 
     ns['string'] = model.IntrinsicType('string')
 

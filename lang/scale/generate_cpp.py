@@ -16,6 +16,8 @@ class Generator(object):
 
         if isinstance(obj, model.Function) or isinstance(obj, model.ExternFunction):
             name = 'fn_' + obj.name
+        elif isinstance(obj, model.Struct):
+            name = 's_' + obj.name
         else:
             assert False, obj
 
@@ -27,6 +29,8 @@ INTRINSIC_MAP = {}
 INTRINSIC_MAP['bool'] = 'bool'
 for sz in [8, 16, 32]:
     INTRINSIC_MAP['i%d' % sz] = 'int%d_t' % sz
+INTRINSIC_MAP['f32'] = 'float'
+INTRINSIC_MAP['f64'] = 'double'
 INTRINSIC_MAP['string'] = 'std::string'
 
 
@@ -67,6 +71,10 @@ def gen_params(params, gen):
 
 class GenerateDeclarations(object):
     __metaclass__ = TypeDispatcher
+
+    @dispatch(model.Struct)
+    def visitStruct(cls, node, gen):
+        gen.out.write('struct ').write(gen.get_name(node)).write(';\n')
 
     @dispatch(model.Function, model.ExternFunction)
     def visitFunction(cls, node, gen):
@@ -231,9 +239,19 @@ class GenerateSource(object):
                 gen.out.write('return ' + gen_arg(node.body, gen)).write(';\n')
         gen.out.write('}\n')
 
-    @dispatch(model.ExternFunction)
-    def visitExternFunction(cls, node, gen):
-        pass
+    @dispatch(model.Field)
+    def visitField(cls, node, gen):
+        GenerateTypeRef.visit(node.t, gen)
+        gen.out.write(' ').write(node.name).write(';\n')
+
+    @dispatch(model.Struct)
+    def visitStruct(cls, node, gen):
+        gen.out.write('\n')
+        gen.out.write('struct ').write(gen.get_name(node)).write(' {\n')
+        with gen.out.block():
+            for f in node.fields:
+                cls.visit(f, gen)
+        gen.out.write('};\n')
 
     @dispatch(model.Program)
     def visitProgram(cls, node, gen):
@@ -244,11 +262,23 @@ class GenerateSource(object):
 
         gen.out.write('\n')
         for m in node.modules:
-            for f in m.functions:
+            for s in m.structs:
+                GenerateDeclarations.visit(s, gen)
+        gen.out.write('\n')
+        for m in node.modules:
+            for f in m.extern_funcs:
+                GenerateDeclarations.visit(f, gen)
+        gen.out.write('\n')
+        for m in node.modules:
+            for f in m.funcs:
                 GenerateDeclarations.visit(f, gen)
 
         for m in node.modules:
-            for f in m.functions:
+            for s in m.structs:
+                cls.visit(s, gen)
+
+        for m in node.modules:
+            for f in m.funcs:
                 cls.visit(f, gen)
 
 

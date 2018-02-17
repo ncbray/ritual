@@ -22,12 +22,22 @@ class FunctionType(object):
     __schema__ = 'params:[]Type rt:Type'
 
 
+class Field(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int name:string t:Type'
+
+
+class Struct(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int name:string module:Module fields:[]Field@[no_init]'
+
+
 class PoisonType(object):
     __metaclass__ = TreeMeta
     __schema__ = ''
 
 
-Type = (IntrinsicType, ModuleType, TupleType, FunctionType, PoisonType)
+Type = (IntrinsicType, ModuleType, TupleType, FunctionType, Struct, PoisonType)
 
 
 class GetLocal(object):
@@ -141,7 +151,7 @@ BaseFunction = (Function, ExternFunction)
 
 class Module(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'name:string functions:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
+    __schema__ = 'name:string structs:[]Struct@[no_init] extern_funcs:[]ExternFunction@[no_init] funcs:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class Program(object):

@@ -88,6 +88,16 @@ struct FuncDecl {
     body:Expr
 }
 
+struct FieldDecl {
+    name:Token
+    t:TypeRef
+}
+
+struct StructDecl {
+    name:Token
+    fields:[]FieldDecl
+}
+
 struct ImportDecl {
     loc:location
     path:[]string
@@ -99,7 +109,7 @@ struct ExternFuncDecl {
     returns:[]TypeRef
 }
 
-union Decl = FuncDecl | ImportDecl | ExternFuncDecl;
+union Decl = FuncDecl | StructDecl | ImportDecl | ExternFuncDecl;
 
 struct Module {
     name:string
@@ -271,12 +281,23 @@ func extern_func_decl():ExternFuncDecl {
     ExternFuncDecl{name, params, returns}
 }
 
+func field_decl():FieldDecl {
+    /name=ident S ":" S t=type_ref S ";"/; FieldDecl{name, t}
+}
+
+func struct_decl():StructDecl {
+    /"struct" end_of_keyword S name=ident S "{" S/;
+    fields=[]FieldDecl{};
+    /(fields<<field_decl (S fields<<field_decl)*)? S "}"/;
+    StructDecl{name, fields}
+}
+
 [export]
 func module(module_name:string, path:string):Module {
     decls = []Decl{};
     (
         S();
-        decls<<(func_decl()|import_decl()|extern_func_decl())
+        decls<<(func_decl()|struct_decl()|import_decl()|extern_func_decl())
     )*;
     S();
     /![^]/;
