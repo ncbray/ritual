@@ -41,6 +41,10 @@ class GenerateTypeRef(object):
     def visitIntrinsicType(cls, node, gen):
         gen.out.write(INTRINSIC_MAP[node.name])
 
+    @dispatch(model.Struct)
+    def visitStruct(cls, node, gen):
+        gen.out.write(gen.get_name(node))
+
     @dispatch(model.TupleType)
     def visitTupleType(cls, node, gen):
         if not node.children:
@@ -260,10 +264,14 @@ class GenerateSource(object):
         for name in includes:
             gen.out.write('#include <%s>\n' % name)
 
-        gen.out.write('\n')
+        structs = []
         for m in node.modules:
-            for s in m.structs:
-                GenerateDeclarations.visit(s, gen)
+            structs += m.structs
+        structs = sort_structs(structs)
+
+        gen.out.write('\n')
+        for s in structs:
+            GenerateDeclarations.visit(s, gen)
         gen.out.write('\n')
         for m in node.modules:
             for f in m.extern_funcs:
@@ -273,13 +281,29 @@ class GenerateSource(object):
             for f in m.funcs:
                 GenerateDeclarations.visit(f, gen)
 
-        for m in node.modules:
-            for s in m.structs:
-                cls.visit(s, gen)
+        for s in structs:
+            cls.visit(s, gen)
 
         for m in node.modules:
             for f in m.funcs:
                 cls.visit(f, gen)
+
+def sort_structs(pending):
+    out = []
+    done = set()
+
+    while pending:
+        defer = []
+        for s in pending:
+            for f in s.fields:
+                if isinstance(f.t, model.Struct) and f.t not in done:
+                    defer.append(s)
+                    break
+            else:
+                out.append(s)
+                done.add(s)
+        pending = defer
+    return out
 
 
 def generate_source(p, out):

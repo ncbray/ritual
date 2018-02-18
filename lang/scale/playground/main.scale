@@ -3,6 +3,11 @@ import foo;
 extern fn print_int(value:i32);
 extern fn print_string(value:string);
 
+struct Bundle {
+    a:Vec3;
+    b:Vec3;
+}
+
 struct Vec3 {
     x:f32;
     y:f32;
