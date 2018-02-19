@@ -288,6 +288,8 @@ class GenerateSource(object):
             for f in m.funcs:
                 cls.visit(f, gen)
 
+
+# TODO something less O(n^2)-ish
 def sort_structs(pending):
     out = []
     done = set()

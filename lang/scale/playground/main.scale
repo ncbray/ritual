@@ -3,6 +3,8 @@ import foo;
 extern fn print_int(value:i32);
 extern fn print_string(value:string);
 
+extern fn assert(value:bool);
+
 struct Bundle {
     a:Vec3;
     b:Vec3;
@@ -19,6 +21,7 @@ fn swap(a:i32, b:i32) -> (i32, i32) {
 }
 
 fn main() {
+    assert(3 == 3);
     print_string("Hello, world.\n\t\u{0482}\u{0f1c}");
     let a = 3;
     let b = 3;
