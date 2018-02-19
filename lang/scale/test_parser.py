@@ -28,15 +28,7 @@ class TestParser(interpreter.testutil.ParserTestCase):
                 parser.NamedTypeRef(parser.Token(30, 'i32')),
             ],
             parser.TupleLiteral(36, [
-                parser.GetName(parser.Token(37, 'b')),
-                parser.GetName(parser.Token(40, 'a')),
+                parser.GetName(37, parser.Token(37, 'b')),
+                parser.GetName(40, parser.Token(40, 'a')),
             ]),
         ))
-
-
-class TestCompile(unittest.TestCase):
-
-    def test_playground(self):
-        root = os.path.join(os.path.dirname(__file__), 'playground')
-        root = os.path.relpath(root)
-        compile.full_compile(root, ['main'])

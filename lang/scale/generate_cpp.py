@@ -266,7 +266,7 @@ class GenerateSource(object):
 
     @dispatch(model.Test)
     def visitTest(cls, node, module, index, gen):
-        name = 'test_%s_%d' % (module.name, index)
+        name = 'test_%s_%d' % (module.name.replace('.', '_'), index)
 
         gen.tmp_id = 0
         gen.out.write('\n')

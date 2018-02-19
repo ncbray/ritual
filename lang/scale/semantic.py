@@ -142,20 +142,21 @@ class IndexNamespace(object):
         extern_funcs = []
         funcs = []
         tests = []
-        for decl in node.decls:
-            obj = cls.visit(decl, module, semantic)
-            if obj is None:
-                pass
-            elif isinstance(obj, model.Struct):
-                structs.append(obj)
-            elif isinstance(obj, model.ExternFunction):
-                extern_funcs.append(obj)
-            elif isinstance(obj, model.Function):
-                funcs.append(obj)
-            elif isinstance(obj, model.Test):
-                tests.append(obj)
-            else:
-                assert False, obj
+        with semantic.namespace(module.namespace):
+            for decl in node.decls:
+                obj = cls.visit(decl, module, semantic)
+                if obj is None:
+                    pass
+                elif isinstance(obj, model.Struct):
+                    structs.append(obj)
+                elif isinstance(obj, model.ExternFunction):
+                    extern_funcs.append(obj)
+                elif isinstance(obj, model.Function):
+                    funcs.append(obj)
+                elif isinstance(obj, model.Test):
+                    tests.append(obj)
+                else:
+                    assert False, obj
 
         module.structs = structs
         module.extern_funcs = extern_funcs
@@ -544,6 +545,7 @@ def process(modules, status):
     p = model.Program()
     for m in modules:
         module = model.Module(m.name)
+        assert m.name not in semantic.modules, m.name
         semantic.modules[m.name] = module
         p.modules.append(module)
 

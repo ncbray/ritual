@@ -8,24 +8,27 @@ import semantic
 import generate_cpp
 
 class ModuleLoader(object):
-    def __init__(self, root, status):
+    def __init__(self, system, root, status):
+        self.system = system
         self.root = root
         self.status = status
-        self.searched = set()
+        self.was_enqueued = set()
         self.pending = []
 
     def module_file(self, path):
-        full = os.path.join(self.root, '/'.join(path) + '.scale')
-        if os.path.exists(full):
-            return full
+        for root in [self.root, self.system]:
+            full = os.path.join(root, '/'.join(path) + '.scale')
+            if os.path.exists(full):
+                return full
 
     def require_module(self, path, loc):
         path = tuple(path)
-        if path in self.searched:
+        if path in self.was_enqueued:
             return
         fn = self.module_file(path)
         if fn:
             self.pending.append((path, fn))
+            self.was_enqueued.add(path)
         else:
             self.status.error('cannot find module "%s"' % '.'.join(path), loc)
 
@@ -57,10 +60,10 @@ def parse_file(module_name, path, status):
     return result.value
 
 
-def frontend(root, entrypoint, status):
+def frontend(system, root, entrypoint, status):
     assert isinstance(entrypoint, list), entrypoint
 
-    loader = ModuleLoader(root, status)
+    loader = ModuleLoader(system, root, status)
     loader.require_module(entrypoint, None)
     status.halt_if_errors()
 

@@ -1,0 +1,4 @@
+extern fn assert(value:bool);
+
+extern fn print_int(value:i32);
+extern fn print_string(value:string);
