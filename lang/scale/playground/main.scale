@@ -20,6 +20,17 @@ fn swap(a:i32, b:i32) -> (i32, i32) {
     (b, foo.passthrough(a))
 }
 
+test "int compare" {
+    assert(1 == 1);
+    assert(1 != 2);
+    assert(1 < 2);
+    assert(1 <= 2);
+    assert(2 <= 2);
+    assert(2 > 1);
+    assert(2 >= 1);
+    assert(2 >= 2)
+}
+
 fn main() {
     assert(3 == 3);
     print_string("Hello, world.\n\t\u{0482}\u{0f1c}");

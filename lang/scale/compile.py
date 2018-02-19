@@ -37,7 +37,7 @@ class FindImports(object):
     def visitImportDecl(cls, node, loader):
         loader.require_module(node.path, node.loc)
 
-    @dispatch(parser.FuncDecl, parser.ExternFuncDecl, parser.StructDecl)
+    @dispatch(parser.FuncDecl, parser.ExternFuncDecl, parser.StructDecl, parser.TestDecl)
     def visiIgnore(cls, node, loader):
         pass
 

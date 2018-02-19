@@ -132,6 +132,11 @@ def is_printable_ascii(c):
     return 32 <= ord(c) < 127
 
 
+def string_literal(s):
+    chars = [escape_char(c) for c in s]
+    return 'u8"' + ''.join(chars) + '"'
+
+
 class GenerateExpr(object):
     __metaclass__ = TypeDispatcher
 
@@ -141,9 +146,7 @@ class GenerateExpr(object):
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, used, gen):
-        chars = [escape_char(c) for c in node.value]
-
-        return 'u8"' + ''.join(chars) + '"', False
+        return string_literal(node.value), False
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
@@ -217,6 +220,14 @@ def gen_void(node, gen):
 class GenerateSource(object):
     __metaclass__ = TypeDispatcher
 
+    @classmethod
+    def declare_locals(self, lcls, skip, gen):
+        for lcl in lcls:
+            if lcl in skip:
+                continue
+            GenerateTypeRef.visit(lcl.t, gen)
+            gen.out.write(' ').write(lcl.name).write(';\n')
+
     @dispatch(model.Function)
     def visitFunction(cls, node, gen):
         gen.tmp_id = 0
@@ -228,11 +239,7 @@ class GenerateSource(object):
         with gen.out.block():
             # Declare locals
             params = set([p.lcl for p in node.params])
-            for lcl in node.locals:
-                if lcl in params:
-                    continue
-                GenerateTypeRef.visit(lcl.t, gen)
-                gen.out.write(' ').write(lcl.name).write(';\n')
+            cls.declare_locals(node.locals, params, gen)
 
             # Generate body
             rt = node.t.rt
@@ -256,6 +263,19 @@ class GenerateSource(object):
             for f in node.fields:
                 cls.visit(f, gen)
         gen.out.write('};\n')
+
+    @dispatch(model.Test)
+    def visitTest(cls, node, module, index, gen):
+        name = 'test_%s_%d' % (module.name, index)
+
+        gen.tmp_id = 0
+        gen.out.write('\n')
+        gen.out.write('void ').write(name).write('() {\n')
+        with gen.out.block():
+            cls.declare_locals(node.locals, set(), gen)
+            gen_void(node.body, gen)
+        gen.out.write('}\n')
+        return name
 
     @dispatch(model.Program)
     def visitProgram(cls, node, gen):
@@ -287,6 +307,21 @@ class GenerateSource(object):
         for m in node.modules:
             for f in m.funcs:
                 cls.visit(f, gen)
+
+        # Tests
+        tests = []
+        for m in node.modules:
+            for i, t in enumerate(m.tests):
+                tests.append((cls.visit(t, m, i, gen), t))
+
+        gen.out.write('\n')
+        gen.out.write('void run_all_tests(void) {\n')
+        with gen.out.block():
+            for name, t in tests:
+                gen.out.write('printf(%s);\n' % string_literal('test: ' + t.desc + '...\n'))
+                gen.out.write('%s();\n' % name)
+        gen.out.write('}\n')
+
 
 
 # TODO something less O(n^2)-ish

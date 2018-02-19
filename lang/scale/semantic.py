@@ -103,6 +103,10 @@ def register(loc, name, value, namespace, semantic):
 class IndexNamespace(object):
     __metaclass__ = TypeDispatcher
 
+    @dispatch(parser.TestDecl)
+    def visitTestDecl(cls, node, module, semantic):
+        pass
+
     @dispatch(parser.ImportDecl)
     def visitImportDecl(cls, node, module, semantic):
         dotted = '.'.join(node.path)
@@ -137,6 +141,7 @@ class IndexNamespace(object):
         structs = []
         extern_funcs = []
         funcs = []
+        tests = []
         for decl in node.decls:
             obj = cls.visit(decl, module, semantic)
             if obj is None:
@@ -147,6 +152,8 @@ class IndexNamespace(object):
                 extern_funcs.append(obj)
             elif isinstance(obj, model.Function):
                 funcs.append(obj)
+            elif isinstance(obj, model.Test):
+                tests.append(obj)
             else:
                 assert False, obj
 
@@ -175,7 +182,7 @@ class ResolveType(object):
 class ResolveSignatures(object):
     __metaclass__ = TypeDispatcher
 
-    @dispatch(parser.ImportDecl)
+    @dispatch(parser.ImportDecl, parser.TestDecl)
     def visitLeaf(cls, node, module, semantic):
         pass
 
@@ -502,6 +509,16 @@ class ResolveCode(object):
     @dispatch(parser.ExternFuncDecl)
     def visitExternFuncDecl(cls, node, module, semantic):
         pass
+
+    @dispatch(parser.TestDecl)
+    def visitTestDecl(cls, node, module, semantic):
+        t = model.Test(node.desc)
+        ns = OrderedDict()
+        semantic.func = t
+        with semantic.namespace(ns):
+            t.body, _ = cls.visit(node.body, False, semantic)
+        semantic.func = None
+        module.tests.append(t)
 
     @dispatch(parser.Module)
     def visitModule(cls, node, module, semantic):

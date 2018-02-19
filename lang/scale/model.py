@@ -149,9 +149,14 @@ class ExternFunction(object):
 BaseFunction = (Function, ExternFunction)
 
 
+class Test(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'desc:string locals:[]Local@[no_init] body:Expr@[no_init]'
+
+
 class Module(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'name:string structs:[]Struct@[no_init] extern_funcs:[]ExternFunction@[no_init] funcs:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
+    __schema__ = 'name:string structs:[]Struct@[no_init] extern_funcs:[]ExternFunction@[no_init] funcs:[]Function@[no_init] tests:[]Test@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class Program(object):

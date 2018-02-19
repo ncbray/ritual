@@ -18,8 +18,10 @@ void fn_assert(bool value) {
   }
 }
 
+void run_all_tests(void);
 void fn_main(void);
 
 int main() {
+  run_all_tests();
   fn_main();
 }
