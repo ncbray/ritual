@@ -88,18 +88,6 @@ def make_function_type(params, returns, semantic):
     return t
 
 
-def register(loc, name, value, namespace, semantic):
-    if name in namespace:
-        semantic.status.error('tried to redefine "%s"' % name, loc)
-        return
-
-    if semantic.lookup(name) is not None:
-        semantic.status.error('"%s" shadows an existing name' % name, loc)
-        return
-
-    namespace[name] = value
-
-
 class IndexNamespace(object):
     __metaclass__ = TypeDispatcher
 
@@ -110,14 +98,14 @@ class IndexNamespace(object):
     @dispatch(parser.ImportDecl)
     def visitImportDecl(cls, node, module, semantic):
         dotted = '.'.join(node.path)
-        register(node.loc, node.path[-1], semantic.modules[dotted], module.namespace, semantic)
+        semantic.register(node.loc, node.path[-1], semantic.modules[dotted])
 
     @dispatch(parser.FuncDecl)
     def visitFuncDecl(cls, node, module, semantic):
         loc = node.name.loc
         name = node.name.text
         f = model.Function(loc, name, module)
-        register(loc, name, f, module.namespace, semantic)
+        semantic.register(loc, name, f)
         return f
 
     @dispatch(parser.StructDecl)
@@ -125,7 +113,7 @@ class IndexNamespace(object):
         loc = node.name.loc
         name = node.name.text
         s = model.Struct(loc, name, module)
-        register(loc, name, s, module.namespace, semantic)
+        semantic.register(loc, name, s)
         return s
 
     @dispatch(parser.ExternFuncDecl)
@@ -133,7 +121,7 @@ class IndexNamespace(object):
         loc = node.name.loc
         name = node.name.text
         f = model.ExternFunction(loc, name, module)
-        register(loc, name, f, module.namespace, semantic)
+        semantic.register(loc, name, f)
         return f
 
     @dispatch(parser.Module)
