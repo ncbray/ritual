@@ -1,19 +1,19 @@
+#include <iostream>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string>
 
 void fn_std_print_int(int32_t value) {
-  printf("%d\n", value);
+  std::cout << value << std::endl;
 }
 
 void fn_std_print_string(std::string value) {
-  printf("%s\n", value.c_str());
+  std::cout << value << std::endl;
 }
 
 void fn_std_assert(bool value) {
   if (!value) {
-    printf("Assertion failed, aborting.\n");
+    std::cerr << "Assertion failed, aborting." << std::endl;
     abort();
   }
 }

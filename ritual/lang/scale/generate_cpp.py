@@ -279,7 +279,7 @@ class GenerateSource(object):
 
     @dispatch(model.Program)
     def visitProgram(cls, node, gen):
-        includes = ['cstdint', 'tuple', 'string']
+        includes = ['cstdint', 'iostream', 'tuple', 'string']
         includes.sort()
         for name in includes:
             gen.out.write('#include <%s>\n' % name)
@@ -326,7 +326,7 @@ class GenerateSource(object):
         gen.out.write('void run_all_tests(void) {\n')
         with gen.out.block():
             for name, t in tests:
-                gen.out.write('printf(%s);\n' % string_literal('test: ' + t.desc + '...\n'))
+                gen.out.write('std::cout << "test: " << %s << "..." << std::endl;\n' % string_literal(t.desc))
                 gen.out.write('%s();\n' % name)
         gen.out.write('}\n')
 
