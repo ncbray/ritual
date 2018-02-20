@@ -24,6 +24,11 @@ struct TupleLiteral {
     args:[]Expr
 }
 
+struct FloatLiteral {
+    loc:location
+    text:string
+}
+
 struct IntLiteral {
     loc:location
     text:string
@@ -63,7 +68,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | BinaryOp;
+union Expr = GetName | Call | GetAttr | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -133,6 +138,10 @@ func hex_digit():rune {
     /[0-9a-fA-Z]/
 }
 
+func float_literal():FloatLiteral {
+    /l=loc text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, text}
+}
+
 func int_literal():IntLiteral {
     /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
 }
@@ -174,6 +183,7 @@ func expr_atom():Expr {
             )
         | /")"/; TupleLiteral{l, []Expr{}}
         )
+    | float_literal()
     | int_literal()
     | string_literal()
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}

@@ -194,16 +194,15 @@ class ResolveSignatures(object):
     @dispatch(parser.StructDecl)
     def visitStructDecl(cls, node, module, semantic):
         s = module.namespace[node.name.text]
-        namespace = OrderedDict()
         fields = []
         for fd in node.fields:
             loc = fd.name.loc
             name = fd.name.text
             f = model.Field(loc, name, ResolveType.visit(fd.t, semantic))
             fields.append(f)
-            if name in namespace:
+            if name in s.namespace:
                 semantic.status.error('tried to redefine "%s"' % name, loc)
-            namespace[name] = f
+            s.namespace[name] = f
         s.fields = fields
 
     @dispatch(parser.ExternFuncDecl)
@@ -236,6 +235,10 @@ class PrintableTypeName(object):
 
     @dispatch(model.IntrinsicType)
     def visitIntrinsicType(cls, node):
+        return node.name
+
+    @dispatch(model.Struct)
+    def visitStruct(cls, node):
         return node.name
 
     @dispatch(model.TupleType)
@@ -365,6 +368,15 @@ class ResolveCode(object):
         # TODO flexible integer types?
         return model.IntLiteral(loc, value), semantic.builtins['i32']
 
+    @dispatch(parser.FloatLiteral)
+    def visitFloatLiteral(cls, node, used, semantic):
+        loc = node.loc
+        # TODO error handling.
+        value = float(node.text)
+        # TODO flexible types?
+        return model.FloatLiteral(loc, node.text, value), semantic.builtins['f32']
+
+
     @dispatch(parser.StringLiteral)
     def visitStringLiteral(cls, node, used, semantic):
         return model.StringLiteral(node.loc, node.value), semantic.builtins['string']
@@ -393,7 +405,14 @@ class ResolveCode(object):
             obj = m.namespace.get(name)
             if obj is None:
                 semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+                return POISON_EXPR, POISON_TYPE
             return wrap_obj(loc, obj)
+        elif isinstance(t, model.Struct):
+            f = t.namespace.get(name)
+            if f is None:
+                semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+                return POISON_EXPR, POISON_TYPE
+            return model.GetField(loc, expr, f), f.t
         else:
             semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
             return POISON_EXPR, POISON_TYPE
@@ -406,28 +425,46 @@ class ResolveCode(object):
 
         if isinstance(et, model.PoisonType):
             return POISON_EXPR, POISON_TYPE
-        
-        if not isinstance(et, model.FunctionType):
+
+        arg_count = len(node.args)
+
+        if isinstance(et, model.FunctionType):
+            # TODO overloads?
+            params = et.params
+            if len(params) != arg_count:
+                semantic.status.error('expected %d arguments, got %d' % (len(params), arg_count, loc))
+                return POISON_EXPR, POISON_TYPE
+
+            for i in range(arg_count):
+                pt = et.params[i]
+                ae = arg_exprs[i]
+                at = arg_types[i]
+                check_can_hold(ae.loc, pt, at, semantic)
+
+            if isinstance(expr, model.GetFunction):
+                return model.DirectCall(loc, expr.f, arg_exprs), et.rt
+            else:
+                assert False, expr
+        elif isinstance(et, model.Struct):
+            fields = et.fields
+            if len(fields) != arg_count:
+                semantic.status.error('expected %d arguments, got %d' % (len(fields), arg_count, loc))
+                return POISON_EXPR, POISON_TYPE
+            
+            for i in range(arg_count):
+                pt = et.fields[i].t
+                ae = arg_exprs[i]
+                at = arg_types[i]
+                check_can_hold(ae.loc, pt, at, semantic)
+
+            if isinstance(expr, model.GetType):
+                return model.Constructor(loc, expr.t, arg_exprs), et
+            else:
+                assert False, expr
+        else:
             semantic.status.error('cannot call %s' % (PrintableTypeName.visit(et)), loc)
             return POISON_EXPR, POISON_TYPE
 
-        # TODO overloads?
-        arg_count = len(node.args)
-        params = et.params
-        if len(params) != arg_count:
-            semantic.status.error('expected %d arguments, got %d' % (len(params), arg_count, loc))
-            return POISON_EXPR, POISON_TYPE
-
-        for i in range(arg_count):
-            pt = et.params[i]
-            ae = arg_exprs[i]
-            at = arg_types[i]
-            check_can_hold(ae.loc, pt, at, semantic)
-
-        if isinstance(expr, model.GetFunction):
-            return model.DirectCall(loc, expr.f, arg_exprs), et.rt
-        else:
-            assert False, expr
 
     @dispatch(parser.TupleLiteral)
     def visitTupleLiteral(cls, node, used, semantic):

@@ -146,9 +146,19 @@ class GenerateExpr(object):
     def visitIntLiteral(cls, node, used, gen):
         return repr(node.value), False
 
+    @dispatch(model.FloatLiteral)
+    def visitFloatLiteral(cls, node, used, gen):
+        return node.text, False
+
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, used, gen):
         return string_literal(node.value), False
+
+    @dispatch(model.Constructor)
+    def visitConstructor(cls, node, used, gen):
+        args = [gen_arg(arg, gen) for arg in node.args]
+        t_name = gen.get_name(node.t)
+        return '%s{%s}' % (t_name, ', '.join(args)), True
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
@@ -169,6 +179,11 @@ class GenerateExpr(object):
     @dispatch(model.GetLocal)
     def visitGetLocal(cls, node, used, gen):
         return node.lcl.name, False
+
+    @dispatch(model.GetField)
+    def visitGetField(cls, node, used, gen):
+        expr = gen_arg(node.expr, gen)
+        return expr + '.' + node.field.name, False
 
     @dispatch(model.Sequence)
     def visitSeqeunce(cls, node, used, gen):

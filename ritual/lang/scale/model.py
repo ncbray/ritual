@@ -29,7 +29,7 @@ class Field(object):
 
 class Struct(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string module:Module fields:[]Field@[no_init]'
+    __schema__ = 'loc:int name:string module:Module fields:[]Field@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class PoisonType(object):
@@ -60,14 +60,29 @@ class GetModule(object):
     __schema__ = 'loc:int m:Module@[backedge]'
 
 
+class GetField(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int expr:Expr field:Field'
+
+
 class DirectCall(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int f:BaseFunction@[backedge] args:[]Expr'
 
 
+class Constructor(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int t:Struct@[backedge] args:[]Expr'
+
+
 class TupleLiteral(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int t:TupleType@[backedge] args:[]Expr'
+
+
+class FloatLiteral(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int text:string value:float'
 
 
 class IntLiteral(object):
@@ -105,7 +120,7 @@ class PoisonExpr(object):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, DirectCall, TupleLiteral, IntLiteral, StringLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
 
 
 class SetLocal(object):
