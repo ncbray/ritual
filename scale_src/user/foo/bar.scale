@@ -4,6 +4,10 @@ fn passthrough(v:i32) -> i32 {
     v
 }
 
+fn name_conflict() -> i32 {
+    11
+}
+
 test "inside submodule" {
-    std.assert(passthrough(7) == 7)
+    std.assert(passthrough(name_conflict()) == name_conflict())
 }

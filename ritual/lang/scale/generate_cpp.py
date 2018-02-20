@@ -15,9 +15,9 @@ class Generator(object):
             return name
 
         if isinstance(obj, model.Function) or isinstance(obj, model.ExternFunction):
-            name = 'fn_' + obj.name
+            name = 'fn_%s_%s' % (obj.module.name.replace('.', '_'), obj.name)
         elif isinstance(obj, model.Struct):
-            name = 's_' + obj.name
+            name = 's_%s_%s' % (obj.module.name.replace('.', '_'), obj.name)
         else:
             assert False, obj
 

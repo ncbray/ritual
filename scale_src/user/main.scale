@@ -16,17 +16,6 @@ fn swap(a:i32, b:i32) -> (i32, i32) {
     (b, bar.passthrough(a))
 }
 
-test "int compare" {
-    std.assert(1 == 1);
-    std.assert(1 != 2);
-    std.assert(1 < 2);
-    std.assert(1 <= 2);
-    std.assert(2 <= 2);
-    std.assert(2 > 1);
-    std.assert(2 >= 1);
-    std.assert(2 >= 2)
-}
-
 fn main() {
     std.print_string("Hello, world.\n\t\u{0482}\u{0f1c}");
     let a = 3;
@@ -38,4 +27,23 @@ fn main() {
         std.print_int(b);
         i = i + 1
     }
+}
+
+fn name_conflict() -> i32 {
+    7
+}
+
+test "name conflict" {
+    std.assert(name_conflict() != bar.name_conflict())
+}
+
+test "int compare" {
+    std.assert(1 == 1);
+    std.assert(1 != 2);
+    std.assert(1 < 2);
+    std.assert(1 <= 2);
+    std.assert(2 <= 2);
+    std.assert(2 > 1);
+    std.assert(2 >= 1);
+    std.assert(2 >= 2)
 }
