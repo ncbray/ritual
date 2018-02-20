@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import collections
+import os.path
 import optparse
 import sys
 
@@ -22,8 +23,12 @@ def parse_args():
     (options, args) = parser.parse_args()
     if not options.system:
         parser.error('Please specify system dir.')
+    if not os.path.isdir(options.system):
+        parser.error('--system should refer to a directory.')
     if not options.root:
         parser.error('Please specify source root.')
+    if not os.path.isdir(options.root):
+        parser.error('--root should refer to a directory.')
     if not options.module:
         parser.error('Please specify module.')
     if not options.out:

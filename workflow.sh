@@ -10,7 +10,7 @@ OUTPUT_SRC=$OUT_DIR/generated.cc
 OUTPUT_BIN=$OUT_DIR/generated
 
 echo "=== Generating ==="
-./sc.py --system lang/scale/system --root lang/scale/playground --module main --out $OUTPUT_SRC
+./sc.py --system scale_src/system --root scale_src/user --module main --out $OUTPUT_SRC
 cat $OUTPUT_SRC
 
 echo
