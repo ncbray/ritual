@@ -5,9 +5,9 @@ import os.path
 import optparse
 import sys
 
-import interpreter.location
-import lang.scale.compile
-import lang.scale.generate_cpp
+import ritual.interpreter.location
+import ritual.lang.scale.compile
+import ritual.lang.scale.generate_cpp
 
 
 CompileConfig = collections.namedtuple('CompileConfig', 'system root module out')
@@ -42,11 +42,12 @@ def parse_args():
 def main():
     config = parse_args()
 
-    status = interpreter.location.CompileStatus()
-    p = lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
+    status = ritual.interpreter.location.CompileStatus()
+    p = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
     status.halt_if_errors()
     with open(config.out, 'w') as f:
-        lang.scale.generate_cpp.generate_source(p, f)
+        ritual.lang.scale.generate_cpp.generate_source(p, f)
+
 
 if __name__ == '__main__':
     try:
