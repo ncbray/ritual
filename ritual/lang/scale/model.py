@@ -62,7 +62,7 @@ class GetModule(object):
 
 class GetField(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int expr:Expr field:Field'
+    __schema__ = 'loc:int expr:Expr field:Field@[backedge]'
 
 
 class DirectCall(object):
@@ -128,6 +128,11 @@ class SetLocal(object):
     __schema__ = 'loc:int lcl:Local@[backedge]'
 
 
+class SetField(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int expr:Expr field:Field@[backedge]'
+
+
 class DestructureTuple(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int args:[]Target'
@@ -138,7 +143,7 @@ class PoisonTarget(object):
     __schema__ = ''
 
 
-Target = (SetLocal, DestructureTuple, PoisonTarget)
+Target = (SetLocal, SetField, DestructureTuple, PoisonTarget)
 
 
 class Param(object):

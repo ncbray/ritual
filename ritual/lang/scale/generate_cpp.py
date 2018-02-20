@@ -97,6 +97,11 @@ class GenerateTarget(object):
     def visitSetLocal(cls, node, gen):
         return node.lcl.name
 
+    @dispatch(model.SetField)
+    def visitSetField(cls, node, gen):
+        expr = gen_arg(node.expr, gen)
+        return expr + '.' + node.field.name
+
     @dispatch(model.DestructureTuple)
     def visitDestructureTuple(cls, node, gen):
         tgts = [cls.visit(tgt, gen) for tgt in node.args]

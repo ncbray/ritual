@@ -312,8 +312,22 @@ class ResolveAssignmentTarget(object):
             check_can_hold(loc, obj.t, value_type, semantic)
             return model.SetLocal(loc, obj)
 
-
-            assert False, obj
+    @dispatch(parser.GetAttr)
+    def visitGetAttr(cls, node, value_type, is_let, semantic):
+        loc = node.loc
+        name = node.name.text
+        expr, t = ResolveCode.visit(node.expr, True, semantic)
+        if isinstance(t, model.PoisonType):
+            return POISON_TARGET
+        elif isinstance(t, model.Struct):
+            f = t.namespace.get(name)
+            if f is None:
+                semantic.status.error('cannot set attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+                return POISON_TARGET
+            return model.SetField(loc, expr, f)
+        else:
+            semantic.status.error('cannot set attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
+            return POISON_TARGET
 
     @dispatch(parser.Let)
     def visitLet(cls, node, value_type, is_let, semantic):

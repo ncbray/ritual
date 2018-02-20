@@ -29,11 +29,19 @@ fn main() {
     }
 }
 
-test "constructor" {
+test "struct constructor" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
     std.assert(2.0 == v.y);
     std.assert(3.0 == v.z)
+}
+
+test "struct setter" {
+    let v = Vec3(1.0, 2.0, 3.0);
+    std.assert(1.0 == v.x);
+    v.x = 7.0;
+    std.assert(7.0 == v.x)
+
 }
 
 fn name_conflict() -> i32 {
