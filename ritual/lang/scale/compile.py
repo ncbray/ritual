@@ -79,14 +79,21 @@ def frontend(system, root, entrypoint, status):
 
     p = semantic.process(modules, status)
     status.halt_if_errors()
-    return p
 
+    # Identify the entrypoint.
+    for m in p.modules:
+        if m.name != '.'.join(entrypoint):
+            continue
+        for f in m.funcs:
+            if f.name != 'main':
+                continue
+            if f.params:
+                continue
+            p.entrypoint = f
+        break
 
-def full_compile(root, entrypoint):
-    status = ritual.interpreter.location.CompileStatus()
-    p = frontend(root, entrypoint, status)
+    if not p.entrypoint:
+        status.error('cannot identify entrypoint')
     status.halt_if_errors()
 
-    out = cStringIO.StringIO()
-    generate_cpp.generate_source(p, out)
-    return out.getvalue()
+    return p

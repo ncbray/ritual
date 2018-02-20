@@ -19,9 +19,9 @@ void fn_std_assert(bool value) {
 }
 
 void run_all_tests(void);
-void fn_main_main(void);
+void entrypoint(void);
 
 int main() {
   run_all_tests();
-  fn_main_main();
+  entrypoint();
 }

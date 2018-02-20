@@ -52,7 +52,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except interpreter.location.HaltCompilation:
+    except ritual.interpreter.location.HaltCompilation:
         sys.exit(1)
     sys.exit(0)
 

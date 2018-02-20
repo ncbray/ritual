@@ -308,6 +308,14 @@ class GenerateSource(object):
             for f in m.funcs:
                 cls.visit(f, gen)
 
+
+        gen.out.write('\n')
+        gen.out.write('void entrypoint(void) {\n')
+        with gen.out.block():
+            gen.out.write(gen.get_name(node.entrypoint)).write('();\n')
+        gen.out.write('}\n')
+
+
         # Tests
         tests = []
         for m in node.modules:

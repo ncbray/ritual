@@ -161,4 +161,4 @@ class Module(object):
 
 class Program(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'modules:[]Module@[no_init]'
+    __schema__ = 'modules:[]Module@[no_init] entrypoint:Function@[no_init]'
