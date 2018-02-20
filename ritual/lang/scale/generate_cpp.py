@@ -82,6 +82,8 @@ class GenerateDeclarations(object):
 
     @dispatch(model.Function, model.ExternFunction)
     def visitFunction(cls, node, gen):
+        if not isinstance(node, model.ExternFunction):
+            gen.out.write('static ')
         GenerateTypeRef.visit(node.t.rt, gen)
         gen.out.write(' ').write(gen.get_name(node)).write('(')
         gen_params(node.params, gen)
@@ -232,6 +234,7 @@ class GenerateSource(object):
     def visitFunction(cls, node, gen):
         gen.tmp_id = 0
         gen.out.write('\n')
+        gen.out.write('static ')
         GenerateTypeRef.visit(node.t.rt, gen)
         gen.out.write(' ').write(gen.get_name(node)).write('(')
         gen_params(node.params, gen)
@@ -270,7 +273,7 @@ class GenerateSource(object):
 
         gen.tmp_id = 0
         gen.out.write('\n')
-        gen.out.write('void ').write(name).write('() {\n')
+        gen.out.write('static void ').write(name).write('() {\n')
         with gen.out.block():
             cls.declare_locals(node.locals, set(), gen)
             gen_void(node.body, gen)
