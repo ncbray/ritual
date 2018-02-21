@@ -343,16 +343,20 @@ class GenerateSource(object):
         tests = []
         for m in node.modules:
             for i, t in enumerate(m.tests):
-                tests.append((cls.visit(t, m, i, gen), t))
+                tests.append((cls.visit(t, m, i, gen), m, t))
 
         gen.out.write('\n')
         gen.out.write('void run_all_tests(void) {\n')
         with gen.out.block():
-            for name, t in tests:
-                gen.out.write('std::cout << "test: " << %s << "..." << std::endl;\n' % string_literal(t.desc))
+            gen.out.write('std::cout << "TESTING" << std::endl;\n')
+            gen.out.write('\n')
+            for name, m, t in tests:
+                gen.out.write('std::cout << "test " << %s << ": " << %s << "..." << std::endl;\n' % (string_literal(m.name), string_literal(t.desc)))
                 gen.out.write('%s();\n' % name)
+            gen.out.write('\n')
+            gen.out.write('std::cout << "DONE" << std::endl;\n')
+            gen.out.write('std::cout << std::endl;\n')
         gen.out.write('}\n')
-
 
 
 # TODO something less O(n^2)-ish

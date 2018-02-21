@@ -1,0 +1,54 @@
+import std;
+
+struct Bundle {
+    a:Vec3;
+    b:Vec3;
+}
+
+struct Vec3 {
+    x:f32;
+    y:f32;
+    z:f32;
+}
+
+test "struct constructor" {
+    let v = Vec3(1.0, 2.0, 3.0);
+    std.assert(1.0 == v.x);
+    std.assert(2.0 == v.y);
+    std.assert(3.0 == v.z)
+}
+
+test "struct setter" {
+    let v = Vec3(1.0, 2.0, 3.0);
+    std.assert(1.0 == v.x);
+    v.x = 7.0;
+    std.assert(7.0 == v.x)
+}
+
+test "struct copy" {
+    let a = Vec3(1.0, 2.0, 3.0);
+    let b = a;
+    b.x = 4.0;
+    std.assert(1.0 == a.x);
+    std.assert(4.0 == b.x)
+}
+
+test "compound constructor" {
+    let bun = Bundle(Vec3(1.0, 2.0, 3.0), Vec3(4.0, 5.0, 6.0));
+    std.assert(1.0 == bun.a.x);
+    std.assert(2.0 == bun.a.y);
+    std.assert(3.0 == bun.a.z);
+    std.assert(4.0 == bun.b.x);
+    std.assert(5.0 == bun.b.y);
+    std.assert(6.0 == bun.b.z)
+}
+
+test "deep copy" {
+    let bun = Bundle(Vec3(1.0, 2.0, 3.0), Vec3(4.0, 5.0, 6.0));
+    bun.b = bun.a;
+    bun.a.x = 7.0;
+    std.assert(7.0 == bun.a.x);
+    std.assert(2.0 == bun.a.y);
+    std.assert(1.0 == bun.b.x);
+    std.assert(2.0 == bun.b.y)
+}
