@@ -43,7 +43,10 @@ class GenerateTypeRef(object):
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
-        gen.out.write(gen.get_name(node))
+        if node.is_ref:
+            gen.out.write('std::shared_ptr<').write(gen.get_name(node)).write('>')
+        else:
+            gen.out.write(gen.get_name(node))
 
     @dispatch(model.TupleType)
     def visitTupleType(cls, node, gen):
@@ -100,7 +103,7 @@ class GenerateTarget(object):
     @dispatch(model.SetField)
     def visitSetField(cls, node, gen):
         expr = gen_arg(node.expr, gen)
-        return expr + '.' + node.field.name
+        return expr + field_deref(node.field, gen)
 
     @dispatch(model.DestructureTuple)
     def visitDestructureTuple(cls, node, gen):
@@ -144,6 +147,14 @@ def string_literal(s):
     return 'u8"' + ''.join(chars) + '"'
 
 
+def field_deref(f, gen):
+    if f.owner.is_ref:
+        sep = '->'
+    else:
+        sep = '.'
+    return sep + f.name
+
+
 class GenerateExpr(object):
     __metaclass__ = TypeDispatcher
 
@@ -163,7 +174,10 @@ class GenerateExpr(object):
     def visitConstructor(cls, node, used, gen):
         args = [gen_arg(arg, gen) for arg in node.args]
         t_name = gen.get_name(node.t)
-        return '%s{%s}' % (t_name, ', '.join(args)), True
+        if node.t.is_ref:
+            return 'std::make_shared<%s>(%s)' % (t_name, ', '.join(args)), True
+        else:
+            return '%s{%s}' % (t_name, ', '.join(args)), True
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
@@ -188,7 +202,7 @@ class GenerateExpr(object):
     @dispatch(model.GetField)
     def visitGetField(cls, node, used, gen):
         expr = gen_arg(node.expr, gen)
-        return expr + '.' + node.field.name, False
+        return expr + field_deref(node.field, gen), False
 
     @dispatch(model.Sequence)
     def visitSeqeunce(cls, node, used, gen):
@@ -280,9 +294,37 @@ class GenerateSource(object):
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
+        name = gen.get_name(node)
         gen.out.write('\n')
-        gen.out.write('struct ').write(gen.get_name(node)).write(' {\n')
+        gen.out.write('struct ').write(name).write(' {\n')
         with gen.out.block():
+
+            if len(node.fields) == 1:
+                gen.out.write('explicit ')
+            gen.out.write(name).write('(')
+
+            # Arguments
+            for i, f in enumerate(node.fields):
+                if i != 0:
+                    gen.out.write(', ')
+                GenerateTypeRef.visit(f.t, gen)
+                gen.out.write(' ').write(f.name)
+            gen.out.write(') : ')
+
+            # Initializers
+            for i, f in enumerate(node.fields):
+                if i != 0:
+                    gen.out.write(', ')
+                gen.out.write(f.name).write('(').write(f.name).write(')')
+
+            gen.out.write(' {}\n\n')
+
+            # Default constructor.
+            # TODO zero value initialization?
+            gen.out.write(name).write('() {}\n\n')
+
+
+
             for f in node.fields:
                 cls.visit(f, gen)
         gen.out.write('};\n')

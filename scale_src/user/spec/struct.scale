@@ -52,3 +52,19 @@ test "deep copy" {
     std.assert(1.0 == bun.b.x);
     std.assert(2.0 == bun.b.y)
 }
+
+class Holder {
+    value:i32;
+}
+
+test "class constructor" {
+    let h = Holder(7);
+    std.assert(h.value == 7)
+}
+
+test "class alias" {
+    let h1 = Holder(7);
+    let h2 = h1;
+    h1.value = 11;
+    std.assert(h2.value == 11)
+}

@@ -111,7 +111,7 @@ class IndexNamespace(object):
     def visitStructDecl(cls, node, module, semantic):
         loc = node.name.loc
         name = node.name.text
-        s = model.Struct(loc, name, module)
+        s = model.Struct(loc, name, node.is_ref, module)
         semantic.register(loc, name, s)
         return s
 
@@ -198,7 +198,7 @@ class ResolveSignatures(object):
         for fd in node.fields:
             loc = fd.name.loc
             name = fd.name.text
-            f = model.Field(loc, name, ResolveType.visit(fd.t, semantic))
+            f = model.Field(loc, name, ResolveType.visit(fd.t, semantic), s)
             fields.append(f)
             if name in s.namespace:
                 semantic.status.error('tried to redefine "%s"' % name, loc)

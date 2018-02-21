@@ -100,6 +100,7 @@ struct FieldDecl {
 
 struct StructDecl {
     name:Token
+    is_ref:bool
     fields:[]FieldDecl
 }
 
@@ -299,10 +300,11 @@ func field_decl():FieldDecl {
 }
 
 func struct_decl():StructDecl {
-    /"struct" end_of_keyword S name=ident S "{" S/;
+    is_ref=(/"struct"/; false | /"class"/; true);
+    /end_of_keyword S name=ident S "{" S/;
     fields=[]FieldDecl{};
     /(fields<<field_decl (S fields<<field_decl)*)? S "}"/;
-    StructDecl{name, fields}
+    StructDecl{name, is_ref, fields}
 }
 
 func test_decl():TestDecl {
