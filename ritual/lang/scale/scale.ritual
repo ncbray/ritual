@@ -26,11 +26,13 @@ struct TupleLiteral {
 
 struct FloatLiteral {
     loc:location
+    neg:bool
     text:string
 }
 
 struct IntLiteral {
     loc:location
+    neg:bool
     text:string
     base:int
 }
@@ -139,12 +141,17 @@ func hex_digit():rune {
     /[0-9a-fA-Z]/
 }
 
+func optional_sign():bool {
+    /"-"/; true
+    | /"+"?/; false
+}
+
 func float_literal():FloatLiteral {
-    /l=loc text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, text}
+    /l=loc neg=optional_sign text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, neg, text}
 }
 
 func int_literal():IntLiteral {
-    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
+    /l=loc neg=optional_sign text=<[0-9]+>/; IntLiteral{l, neg, text, 10}
 }
 
 func escape_char():rune {
@@ -201,10 +208,19 @@ func expr_postfix():Expr {
     e
 }
 
-func expr_add():Expr {
+func expr_mul():Expr {
     e=expr_postfix();
     (
-        /S l=loc op=<"+"|"-"> S other=expr_postfix/;
+        /S l=loc op=<"*"|"/"|"%"> S other=expr_postfix/;
+        e = BinaryOp{l, e, op, other}
+    )*;
+    e
+}
+
+func expr_add():Expr {
+    e=expr_mul();
+    (
+        /S l=loc op=<"+"|"-"> S other=expr_mul/;
         e = BinaryOp{l, e, op, other}
     )*;
     e

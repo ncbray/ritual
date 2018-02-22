@@ -1,6 +1,7 @@
 import std;
 import foo.bar;
 
+import spec.numeric;
 import spec.struct;
 
 fn swap(a:i32, b:i32) -> (i32, i32) {
@@ -28,13 +29,3 @@ test "name conflict" {
     std.assert(name_conflict() != bar.name_conflict())
 }
 
-test "int compare" {
-    std.assert(1 == 1);
-    std.assert(1 != 2);
-    std.assert(1 < 2);
-    std.assert(1 <= 2);
-    std.assert(2 <= 2);
-    std.assert(2 > 1);
-    std.assert(2 >= 1);
-    std.assert(2 >= 2)
-}

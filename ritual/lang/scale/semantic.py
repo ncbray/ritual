@@ -379,6 +379,8 @@ class ResolveCode(object):
         loc = node.loc
         # TODO error handling.
         value = int(node.text, node.base)
+        if node.neg:
+            value = -value
         # TODO flexible integer types?
         return model.IntLiteral(loc, value), semantic.builtins['i32']
 
@@ -386,9 +388,13 @@ class ResolveCode(object):
     def visitFloatLiteral(cls, node, used, semantic):
         loc = node.loc
         # TODO error handling.
+        text = node.text
         value = float(node.text)
+        if node.neg:
+            text = '-' + text
+            value = -value
         # TODO flexible types?
-        return model.FloatLiteral(loc, node.text, value), semantic.builtins['f32']
+        return model.FloatLiteral(loc, text, value), semantic.builtins['f32']
 
 
     @dispatch(parser.StringLiteral)
@@ -504,7 +510,7 @@ class ResolveCode(object):
         else:
             t = VOID_TYPE
         # HACK
-        loc = children[-1].loc if children else -1
+        loc = children[-1].loc if children and hasattr(children[-1], 'loc') else -1
         return model.Sequence(loc, children), t
 
     @dispatch(parser.BinaryOp)
