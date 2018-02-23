@@ -533,6 +533,28 @@ class ResolveCode(object):
             t = lt
         return model.BinaryOp(loc, l, node.op, r), t
 
+    @dispatch(parser.If)
+    def visitIf(cls, node, used, semantic):
+        loc = node.loc
+        cond, ct = cls.visit(node.cond, True, semantic)
+        check_can_hold(node.cond.loc, semantic.builtins['bool'], ct, semantic)
+        te, tt = cls.visit(node.t, used, semantic)
+        fe, ft = cls.visit(node.f, used, semantic)
+
+        if not used:
+            t = VOID_TYPE
+        elif tt == POISON_TYPE or ft == POISON_TYPE:
+            t = POISON_TYPE
+        elif can_hold(tt, ft):
+            t = tt
+        elif can_hold(ft, tt):
+            t = ft
+        else:
+            semantic.status.error('cannot unify types %s and %s' % (PrintableTypeName.visit(tt), PrintableTypeName.visit(ft)), loc)
+            t = POISON_TYPE
+
+        return model.If(loc, cond, te, fe, t), t
+
     @dispatch(parser.While)
     def visitWhile(cls, node, used, semantic):
         cond, ct = cls.visit(node.cond, True, semantic)

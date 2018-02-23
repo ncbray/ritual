@@ -60,6 +60,13 @@ struct Sequence {
     children:[]Expr
 }
 
+struct If {
+    loc:location
+    cond:Expr
+    t:Expr
+    f:Expr
+}
+
 struct While {
     loc:location
     cond:Expr
@@ -79,7 +86,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | PrefixOp | BinaryOp;
+union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | If | While | PrefixOp | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -203,7 +210,8 @@ func expr_atom():Expr {
         | /"false" end_of_keyword/; BooleanLiteral{l, false}
         )
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
-    | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr S "}"/; While{l, cond, body}
+    | /l=loc "if" end_of_keyword S cond=expr S "{" S t=expr_or_nothing S "}"/; (/S "else" S "{" S  f=expr_or_nothing S "}"/| f=Sequence{[]Expr{}}); If{l, cond, t, f}
+    | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr_or_nothing S "}"/; While{l, cond, body}
     | GetName{loc(), ident()}
     )
 }

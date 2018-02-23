@@ -1,0 +1,16 @@
+import std;
+
+fn select(a:bool, b:bool) -> i32 {
+  if a {
+      if b {4} else {3}
+  } else {
+      if b {2} else {1}
+  }
+}
+
+test "if expr" {
+  std.assert(select(false, false) == 1);
+  std.assert(select(false, true) == 2);
+  std.assert(select(true, false) == 3);
+  std.assert(select(true, true) == 4)
+}

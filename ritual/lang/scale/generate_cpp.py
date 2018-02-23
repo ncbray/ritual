@@ -8,7 +8,12 @@ class Generator(object):
         self.out = out
         self.names = {}
         self.tmp_id = 0
-    
+
+    def alloc_temp(self):
+        tmp = 'tmp_%d' % self.tmp_id
+        self.tmp_id += 1
+        return tmp
+
     def get_name(self, obj):
         name = self.names.get(obj)
         if name is not None:
@@ -236,6 +241,24 @@ class GenerateExpr(object):
         right = gen_arg(node.right, gen)
         return '%s %s %s' % (left, node.op, right), True
 
+    @dispatch(model.If)
+    def visitIf(cls, node, used, gen):
+        tmp = None
+        if used:
+            tmp = gen.alloc_temp()
+            GenerateTypeRef.visit(node.rt, gen)
+            gen.out.write(' ').write(tmp).write(';\n')
+
+        cond, _ = cls.visit(node.cond, True, gen)
+        gen.out.write('if (%s) {\n' % cond)
+        with gen.out.block():
+            gen_capture(node.t, tmp, gen)
+        gen.out.write('} else {\n')
+        with gen.out.block():
+            gen_capture(node.f, tmp, gen)
+        gen.out.write('}\n')
+        return tmp, True
+
     @dispatch(model.While)
     def visitWhile(cls, node, used, gen):
         assert not used
@@ -251,13 +274,19 @@ class GenerateExpr(object):
 def gen_arg(node, gen):
     expr, impure = GenerateExpr.visit(node, True, gen)
     if impure:
-        tmp = 'tmp_%d' % gen.tmp_id
-        gen.tmp_id += 1
+        tmp = gen.alloc_temp()
         gen.out.write('auto %s = %s;\n' % (tmp, expr))
         return tmp
     else:
         return expr
 
+
+def gen_capture(node, target, gen):
+    if target:
+        expr, _ = GenerateExpr.visit(node, True, gen)
+        gen.out.write('%s = %s;\n' % (target, expr))
+    else:
+        gen_void(node, gen)
 
 def gen_void(node, gen):
     expr, impure = GenerateExpr.visit(node, False, gen)
