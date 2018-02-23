@@ -10,14 +10,16 @@ fn swap(a:i32, b:i32) -> (i32, i32) {
 }
 
 fn main() {
-    std.print_string("Hello, world.\n\t\u{0482}\u{0f1c}");
+    std.print_string("Hello, world.\n\t\u{0482}\u{0f1c}\n");
     let a = 3;
     let b = 3;
     let i = 0;
     while i < 5 {
         (a, b) = swap(a-1, b+b);
         std.print_int(a);
+        std.print_string(" ");
         std.print_int(b);
+        std.print_string("\n");
         i = i + 1
     }
 }

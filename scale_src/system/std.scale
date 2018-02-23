@@ -4,17 +4,19 @@ extern fn print_string(value:string);
 
 fn assert(value:bool) {
     if (!value) {
-        print_string("Assert failed.");
+        print_string("Assert failed.\n");
         abort()
     }
 }
 
 fn assertEqualI32(a:i32, b:i32) {
     if (a != b) {
-        print_string("Assert failed.");
+        print_string("Assert failed.\n");
+        print_string("    ");
         print_int(a);
-        print_string("!=");
+        print_string(" != ");
         print_int(b);
+        print_string("\n");
         abort()
     }
 }
