@@ -158,6 +158,10 @@ def field_deref(f, gen):
 class GenerateExpr(object):
     __metaclass__ = TypeDispatcher
 
+    @dispatch(model.BooleanLiteral)
+    def visitBooleanLiteral(cls, node, used, gen):
+        return 'true' if node.value else 'false', False
+
     @dispatch(model.IntLiteral)
     def visitIntLiteral(cls, node, used, gen):
         return repr(node.value), False

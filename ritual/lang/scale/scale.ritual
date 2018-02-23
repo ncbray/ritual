@@ -19,6 +19,11 @@ struct Call {
     args:[]Expr
 }
 
+struct BooleanLiteral {
+    loc:location
+    value:bool
+}
+
 struct TupleLiteral {
     loc:location
     args:[]Expr
@@ -74,7 +79,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | PrefixOp | BinaryOp;
+union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | PrefixOp | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -193,6 +198,10 @@ func expr_atom():Expr {
     | float_literal()
     | int_literal()
     | string_literal()
+    | l=loc();
+        ( /"true" end_of_keyword/; BooleanLiteral{l, true}
+        | /"false" end_of_keyword/; BooleanLiteral{l, false}
+        )
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
     | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr S "}"/; While{l, cond, body}
     | GetName{loc(), ident()}
@@ -208,7 +217,7 @@ func expr_postfix():Expr {
 }
 
 func expr_prefix():Expr {
-  /l=loc op=<"+"|"-"> S/; PrefixOp{l, op, expr_prefix()}
+  /l=loc op=<"+"|"-"|"!"> S/; PrefixOp{l, op, expr_prefix()}
   | expr_postfix()
 }
 

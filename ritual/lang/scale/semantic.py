@@ -374,6 +374,10 @@ class ResolveCode(object):
     def visitLeaf(cls, node, module, semantic):
         pass
 
+    @dispatch(parser.BooleanLiteral)
+    def visitBooleanLiteral(cls, node, used, semantic):
+        return model.BooleanLiteral(node.loc, node.value), semantic.builtins['bool']
+
     @dispatch(parser.IntLiteral)
     def visitIntLiteral(cls, node, used, semantic):
         loc = node.loc
@@ -512,6 +516,8 @@ class ResolveCode(object):
     def visitPrefixOp(cls, node, used, semantic):
         loc = node.loc
         expr, t = cls.visit(node.expr, used, semantic)
+        if node.op == '!':
+            t = semantic.builtins['bool']
         return model.PrefixOp(loc, node.op, expr), t
 
     @dispatch(parser.BinaryOp)

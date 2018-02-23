@@ -75,6 +75,11 @@ class Constructor(object):
     __schema__ = 'loc:int t:Struct@[backedge] args:[]Expr'
 
 
+class BooleanLiteral(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int value:bool'
+
+
 class TupleLiteral(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int t:TupleType@[backedge] args:[]Expr'
@@ -124,7 +129,7 @@ class PoisonExpr(object):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, While, PoisonExpr)
 
 
 class SetLocal(object):

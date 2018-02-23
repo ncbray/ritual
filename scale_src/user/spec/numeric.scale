@@ -1,5 +1,19 @@
 import std;
 
+test "bool neg" {
+    std.assert(!false);
+    std.assert(!!true)
+}
+
+test "bool compare" {
+    std.assert(true == true);
+    std.assert(true != false);
+    std.assert(false != true);
+    std.assert(false == false);
+    std.assert(true == !false);
+    std.assert(!true == false)
+}
+
 test "i32 compare" {
     std.assert(1 == 1);
     std.assert(1 != 2);
@@ -19,7 +33,6 @@ test "i32 neg simple" {
 test "i32 neg prec" {
     std.assert(-(2+3) == -5)
 }
-
 
 test "i32 add" {
     std.assert(1 + 2 == 3);

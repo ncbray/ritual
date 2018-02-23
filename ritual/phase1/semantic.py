@@ -406,6 +406,9 @@ class CheckRules(object):
         node.t = model.DirectRef(GetLoc.visit(node.t), st)
         node.args, args = cls.visitArgs(node.args, semantic)
 
+        if isinstance(st, model.PoisonType):
+            return node, st
+
         if not isinstance(st, model.StructType):
             semantic.status.error('Not a struct', GetLoc.visit(node.t))
             return node, semantic.poison
