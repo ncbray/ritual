@@ -1,0 +1,36 @@
+repo_root = ..
+scale_src = $repo_root/scale_src
+libscale_dir = $repo_root/libscale
+
+flags = -O1 -Werror -Wall
+# -fsanitize=address -fno-omit-frame-pointer
+# -fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti -fno-math-errno -fmerge-all-constants -fno-ident
+
+
+rule compile_cpp
+  command = clang++ $flags -std=c++14 -c $in -o $out -MMD -MF $out.d
+  deps = gcc
+  depfile = $out.d
+
+rule link
+  command = clang++ $flags $in -o $out
+
+rule compile_scale
+  command = ../sc.py --system $scale_src/system --root $scale_src/user --module $module --out $out
+  restat = 1
+
+rule run
+  command = ./$in && touch $out
+  pool = console
+
+build ALWAYS_REBUILD: phony
+
+build generated.cc: compile_scale | ALWAYS_REBUILD
+  module = main
+
+build generated.o: compile_cpp generated.cc
+build runtime.o: compile_cpp $libscale_dir/runtime.cc
+
+build generated: link generated.o runtime.o
+
+build test.stamp: run generated
