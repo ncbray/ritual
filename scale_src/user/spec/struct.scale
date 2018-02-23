@@ -59,12 +59,12 @@ class Holder {
 
 test "class constructor" {
     let h = Holder(7);
-    std.assert(h.value == 7)
+    std.assertEqualI32(h.value,  7)
 }
 
 test "class alias" {
     let h1 = Holder(7);
     let h2 = h1;
     h1.value = 11;
-    std.assert(h2.value == 11)
+    std.assertEqualI32(h2.value, 11)
 }

@@ -9,8 +9,8 @@ fn select(a:bool, b:bool) -> i32 {
 }
 
 test "if expr" {
-  std.assert(select(false, false) == 1);
-  std.assert(select(false, true) == 2);
-  std.assert(select(true, false) == 3);
-  std.assert(select(true, true) == 4)
+  std.assertEqualI32(select(false, false), 1);
+  std.assertEqualI32(select(false, true), 2);
+  std.assertEqualI32(select(true, false), 3);
+  std.assertEqualI32(select(true, true), 4)
 }

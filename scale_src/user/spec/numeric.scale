@@ -31,34 +31,34 @@ test "i32 neg simple" {
 }
 
 test "i32 neg prec" {
-    std.assert(-(2+3) == -5)
+    std.assertEqualI32(-(2+3), -5)
 }
 
 test "i32 add" {
-    std.assert(1 + 2 == 3);
-    std.assert(1 - 2 == -1)
+    std.assertEqualI32(1 + 2, 3);
+    std.assertEqualI32(1 - 2, -1)
 }
 
 test "i32 mul" {
-    std.assert(3 * 7 == 21);
-    std.assert(-3 * 7 == -21);
-    std.assert(3 * -7 == -21);
-    std.assert(-3 * -7 == 21)
+    std.assertEqualI32(3 * 7, 21);
+    std.assertEqualI32(-3 * 7, -21);
+    std.assertEqualI32(3 * -7, -21);
+    std.assertEqualI32(-3 * -7, 21)
 }
 
 test "i32 div" {
-    std.assert(7 / 2 == 3);
-    std.assert(-7 / 2 == -3);
-    std.assert(7 / -2 == -3);
-    std.assert(-7 / -2 == 3)
+    std.assertEqualI32(7 / 2, 3);
+    std.assertEqualI32(-7 / 2, -3);
+    std.assertEqualI32(7 / -2, -3);
+    std.assertEqualI32(-7 / -2, 3)
 }
 
 // NOTE: current a remainder operation - should it be modulo?  ((m % n) + n) % n
 test "i32 mod" {
-    std.assert(7 % 3 == 1);
-    std.assert(-7 % 3 == -1);
-    std.assert(7 % -3 == 1);
-    std.assert(-7 % -3 == -1)
+    std.assertEqualI32(7 % 3, 1);
+    std.assertEqualI32(-7 % 3, -1);
+    std.assertEqualI32(7 % -3, 1);
+    std.assertEqualI32(-7 % -3, -1)
 }
 
 
