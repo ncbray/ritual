@@ -11,6 +11,16 @@ test "i32 compare" {
     std.assert(2 >= 2)
 }
 
+test "i32 neg simple" {
+    let v = 7;
+    std.assert(-v  < -6)
+}
+
+test "i32 neg prec" {
+    std.assert(-(2+3) == -5)
+}
+
+
 test "i32 add" {
     std.assert(1 + 2 == 3);
     std.assert(1 - 2 == -1)

@@ -26,13 +26,11 @@ struct TupleLiteral {
 
 struct FloatLiteral {
     loc:location
-    neg:bool
     text:string
 }
 
 struct IntLiteral {
     loc:location
-    neg:bool
     text:string
     base:int
 }
@@ -63,6 +61,12 @@ struct While {
     body:Expr
 }
 
+struct PrefixOp {
+    loc:location
+    op:string
+    expr:Expr
+}
+
 struct BinaryOp {
     loc:location
     left:Expr
@@ -70,7 +74,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | BinaryOp;
+union Expr = GetName | Call | GetAttr | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | While | PrefixOp | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -141,17 +145,12 @@ func hex_digit():rune {
     /[0-9a-fA-Z]/
 }
 
-func optional_sign():bool {
-    /"-"/; true
-    | /"+"?/; false
-}
-
 func float_literal():FloatLiteral {
-    /l=loc neg=optional_sign text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, neg, text}
+    /l=loc text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, text}
 }
 
 func int_literal():IntLiteral {
-    /l=loc neg=optional_sign text=<[0-9]+>/; IntLiteral{l, neg, text, 10}
+    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
 }
 
 func escape_char():rune {
@@ -187,9 +186,9 @@ func expr_atom():Expr {
                 /(S "," S args<<expr)+/;
                 /S ")"/;
                 TupleLiteral{l, args}
-            | e
+            | /S ")"/; e
             )
-        | /")"/; TupleLiteral{l, []Expr{}}
+        | /S ")"/; TupleLiteral{l, []Expr{}}
         )
     | float_literal()
     | int_literal()
@@ -208,10 +207,15 @@ func expr_postfix():Expr {
     e
 }
 
+func expr_prefix():Expr {
+  /l=loc op=<"+"|"-"> S/; PrefixOp{l, op, expr_prefix()}
+  | expr_postfix()
+}
+
 func expr_mul():Expr {
-    e=expr_postfix();
+    e=expr_prefix();
     (
-        /S l=loc op=<"*"|"/"|"%"> S other=expr_postfix/;
+        /S l=loc op=<"*"|"/"|"%"> S other=expr_prefix/;
         e = BinaryOp{l, e, op, other}
     )*;
     e

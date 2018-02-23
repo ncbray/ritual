@@ -105,6 +105,10 @@ class Sequence(object):
     __schema__ = 'loc:int children:[]Expr'
 
 
+class PrefixOp(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int op:string expr:Expr'
+
 class BinaryOp(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int left:Expr op:string right:Expr'
@@ -120,7 +124,7 @@ class PoisonExpr(object):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, BinaryOp, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, While, PoisonExpr)
 
 
 class SetLocal(object):

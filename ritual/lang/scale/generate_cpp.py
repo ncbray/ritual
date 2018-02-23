@@ -218,6 +218,11 @@ class GenerateExpr(object):
         gen.out.write(target + ' = ' + value + ';\n')
         return None, True
 
+    @dispatch(model.PrefixOp)
+    def visitPrefixOp(cls, node, used, gen):
+        expr = gen_arg(node.expr, gen)
+        return node.op + expr, True
+
     @dispatch(model.BinaryOp)
     def visitBinaryOp(cls, node, used, gen):
         left = gen_arg(node.left, gen)
