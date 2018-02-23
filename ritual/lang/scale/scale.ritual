@@ -275,6 +275,10 @@ func expr():Expr {
     expr_sequence()
 }
 
+func expr_or_nothing():Expr {
+    expr_sequence() | Sequence{[]Expr{}}
+}
+
 func type_ref():TypeRef {
     NamedTypeRef{ident()}
     | /"[]" S/; ListTypeRef{type_ref()}
@@ -307,7 +311,7 @@ func func_returns():[]TypeRef {
 }
 
 func func_decl():FuncDecl {
-    /"fn" end_of_keyword S name=ident S params=func_params S returns=func_returns S "{" S body=expr S "}"/;
+    /"fn" end_of_keyword S name=ident S params=func_params S returns=func_returns S "{" S body=expr_or_nothing S "}"/;
     FuncDecl{name, params, returns, body}
 }
 
@@ -337,7 +341,7 @@ func struct_decl():StructDecl {
 }
 
 func test_decl():TestDecl {
-    /"test" S desc=string_value S "{" S body=expr S "}"/;
+    /"test" S desc=string_value S "{" S body=expr_or_nothing S "}"/;
     TestDecl{desc, body}
 }
 

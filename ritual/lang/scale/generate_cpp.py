@@ -210,6 +210,9 @@ class GenerateExpr(object):
 
     @dispatch(model.Sequence)
     def visitSeqeunce(cls, node, used, gen):
+        if not node.children:
+            assert not used
+            return None, True
         for child in node.children[:-1]:
             gen_void(child, gen)
         return cls.visit(node.children[-1], used, gen)
