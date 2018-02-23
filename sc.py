@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import collections
+import cStringIO
 import os.path
 import optparse
 import sys
@@ -39,15 +40,26 @@ def parse_args():
     return CompileConfig(options.system, options.root, options.module, options.out)
 
 
+def file_is_same(path, text):
+    if not os.path.isfile(path):
+        return False
+    with open(path) as f:
+        return f.read() == text
+
+
 def main():
     config = parse_args()
 
     status = ritual.interpreter.location.CompileStatus()
     p = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
     status.halt_if_errors()
-    with open(config.out, 'w') as f:
-        ritual.lang.scale.generate_cpp.generate_source(p, f)
+    buf = cStringIO.StringIO()
+    ritual.lang.scale.generate_cpp.generate_source(p, buf)
+    src = buf.getvalue()
 
+    if not file_is_same(config.out, src):
+        with open(config.out, 'w') as f:
+            f.write(src)
 
 if __name__ == '__main__':
     try:
