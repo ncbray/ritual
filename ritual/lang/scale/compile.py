@@ -14,11 +14,24 @@ class ModuleLoader(object):
         self.status = status
         self.was_enqueued = set()
         self.pending = []
+        self.files = set([system, root])
+
+    def check_exists(self, root, path):
+        for i in range(1, len(path)-1):
+            partial = os.path.join(root, *path[:i])
+            if not os.path.exists(partial):
+                return None
+            self.files.add(partial)
+
+        full = os.path.join(root, '/'.join(path) + '.scale')
+        if os.path.exists(full):
+            self.files.add(full)
+            return full
 
     def module_file(self, path):
         for root in [self.root, self.system]:
-            full = os.path.join(root, '/'.join(path) + '.scale')
-            if os.path.exists(full):
+            full = self.check_exists(root, path)
+            if full:
                 return full
 
     def require_module(self, path, loc):
@@ -96,4 +109,4 @@ def frontend(system, root, entrypoint, status):
         status.error('cannot identify entrypoint')
     status.halt_if_errors()
 
-    return p
+    return p, loader.files

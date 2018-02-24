@@ -11,7 +11,7 @@ import ritual.lang.scale.compile
 import ritual.lang.scale.generate_cpp
 
 
-CompileConfig = collections.namedtuple('CompileConfig', 'system root module out')
+CompileConfig = collections.namedtuple('CompileConfig', 'system root module out deps')
 
 
 def parse_args():
@@ -19,6 +19,7 @@ def parse_args():
     parser.add_option("--system", dest="system", metavar="DIR")
     parser.add_option("--root", dest="root", metavar="DIR")
     parser.add_option("--module", dest="module", metavar="MODULE")
+    parser.add_option("--deps", dest="deps", metavar="MODULE")
     parser.add_option("--out", dest="out", metavar="FILE")
 
     (options, args) = parser.parse_args()
@@ -37,7 +38,7 @@ def parse_args():
 
     if len(args) != 0:
         parser.error('No arguments.')
-    return CompileConfig(options.system, options.root, options.module, options.out)
+    return CompileConfig(options.system, options.root, options.module, options.out, options.deps)
 
 
 def file_is_same(path, text):
@@ -47,11 +48,20 @@ def file_is_same(path, text):
         return f.read() == text
 
 
+# Note: this isn't complete - it can miss dynamically generated code from non-python files.
+# But close enough.
+def get_loaded_python_files(files):
+    for name, m in sys.modules.iteritems():
+        if not m or not hasattr(m, '__file__'):
+            continue
+        files.add(m.__file__)
+
+
 def main():
     config = parse_args()
 
     status = ritual.interpreter.location.CompileStatus()
-    p = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
+    p, files = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
     status.halt_if_errors()
     buf = cStringIO.StringIO()
     ritual.lang.scale.generate_cpp.generate_source(p, buf)
@@ -60,6 +70,18 @@ def main():
     if not file_is_same(config.out, src):
         with open(config.out, 'w') as f:
             f.write(src)
+
+    if config.deps:
+        get_loaded_python_files(files)
+        files = sorted(files)
+        with open(config.deps, 'w') as f:
+            f.write(config.out)
+            f.write(': \\\n')
+            for fn in files:
+                f.write(fn)
+                f.write(' \\\n')
+            f.write('\n')
+
 
 if __name__ == '__main__':
     try:

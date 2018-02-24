@@ -8,7 +8,7 @@ flags = -O1 -Werror -Wall
 
 
 rule compile_cpp
-  command = clang++ $flags -std=c++14 -c $in -o $out -MMD -MF $out.d
+  command = clang++ $flags -std=c++14 -c $in -o $out -MD -MF $out.d
   deps = gcc
   depfile = $out.d
 
@@ -16,16 +16,16 @@ rule link
   command = clang++ $flags $in -o $out
 
 rule compile_scale
-  command = ../sc.py --system $scale_src/system --root $scale_src/user --module $module --out $out
+  command = ../sc.py --system $scale_src/system --root $scale_src/user --module $module --out $out --deps $out.d
+  deps = gcc
+  depfile = $out.d
   restat = 1
 
 rule run
   command = ./$in && touch $out
   pool = console
 
-build ALWAYS_REBUILD: phony
-
-build generated.cc: compile_scale | ALWAYS_REBUILD
+build generated.cc: compile_scale
   module = main
 
 build generated.o: compile_cpp generated.cc
