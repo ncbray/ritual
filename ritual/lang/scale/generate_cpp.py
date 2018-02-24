@@ -34,6 +34,7 @@ INTRINSIC_MAP = {}
 INTRINSIC_MAP['bool'] = 'bool'
 for sz in [8, 16, 32]:
     INTRINSIC_MAP['i%d' % sz] = 'int%d_t' % sz
+    INTRINSIC_MAP['u%d' % sz] = 'uint%d_t' % sz
 INTRINSIC_MAP['f32'] = 'float'
 INTRINSIC_MAP['f64'] = 'double'
 INTRINSIC_MAP['string'] = 'std::string'
@@ -239,7 +240,11 @@ class GenerateExpr(object):
     def visitBinaryOp(cls, node, used, gen):
         left = gen_arg(node.left, gen)
         right = gen_arg(node.right, gen)
-        return '%s %s %s' % (left, node.op, right), True
+        expr = '%s %s %s' % (left, node.op, right)
+        # Small ints are automatically upcasted, make sure they stay the same size.
+        if node.t.name in ['u8', 'i8', 'u16', 'i16'] and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
+            expr = '(%s)(%s)' % (INTRINSIC_MAP[node.t.name], expr)
+        return expr, True
 
     @dispatch(model.If)
     def visitIf(cls, node, used, gen):

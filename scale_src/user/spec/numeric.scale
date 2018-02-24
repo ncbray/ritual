@@ -14,6 +14,11 @@ test "bool compare" {
     std.assert(!true == false)
 }
 
+test "u8 overflow" {
+    std.assert(65u8 * 65u8 == 129u8)
+}
+
+
 test "i32 compare" {
     std.assert(1 == 1);
     std.assert(1 != 2);

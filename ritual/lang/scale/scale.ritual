@@ -32,12 +32,14 @@ struct TupleLiteral {
 struct FloatLiteral {
     loc:location
     text:string
+    postfix:string
 }
 
 struct IntLiteral {
     loc:location
     text:string
     base:int
+    postfix:string
 }
 
 struct StringLiteral {
@@ -157,12 +159,16 @@ func hex_digit():rune {
     /[0-9a-fA-Z]/
 }
 
+func number_postfix():string {
+    </("i"|"u")("8"|"16"|"32"|"64") | "f"("32"|"64")/>
+}
+
 func float_literal():FloatLiteral {
-    /l=loc text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, text}
+    /l=loc text=<[0-9]+ "." [0-9]+>/; FloatLiteral{l, text, number_postfix()|"f32"}
 }
 
 func int_literal():IntLiteral {
-    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10}
+    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10, number_postfix()|"i32"}
 }
 
 func escape_char():rune {

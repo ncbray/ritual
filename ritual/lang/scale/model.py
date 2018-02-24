@@ -114,9 +114,10 @@ class PrefixOp(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int op:string expr:Expr'
 
+
 class BinaryOp(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int left:Expr op:string right:Expr'
+    __schema__ = 'loc:int left:Expr op:string right:Expr t:Type'
 
 
 class If(object):

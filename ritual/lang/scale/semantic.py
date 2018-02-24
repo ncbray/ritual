@@ -383,8 +383,11 @@ class ResolveCode(object):
         loc = node.loc
         # TODO error handling.
         value = int(node.text, node.base)
-        # TODO flexible integer types?
-        return model.IntLiteral(loc, value), semantic.builtins['i32']
+        t = semantic.builtins[node.postfix]
+        if t.name.startswith('f'):
+            return model.FloatLiteral(loc, value), t
+        else:
+            return model.IntLiteral(loc, value), t
 
     @dispatch(parser.FloatLiteral)
     def visitFloatLiteral(cls, node, used, semantic):
@@ -393,7 +396,8 @@ class ResolveCode(object):
         text = node.text
         value = float(node.text)
         # TODO flexible types?
-        return model.FloatLiteral(loc, text, value), semantic.builtins['f32']
+        t = semantic.builtins[node.postfix]
+        return model.FloatLiteral(loc, text, value), t
 
 
     @dispatch(parser.StringLiteral)
@@ -531,7 +535,7 @@ class ResolveCode(object):
             t = semantic.builtins['bool']
         else:
             t = lt
-        return model.BinaryOp(loc, l, node.op, r), t
+        return model.BinaryOp(loc, l, node.op, r, lt), t
 
     @dispatch(parser.If)
     def visitIf(cls, node, used, semantic):
@@ -605,12 +609,8 @@ def process(modules, status):
 
     ns = semantic.builtins
     ns['bool'] = model.IntrinsicType('bool')
-    ns['i8'] = model.IntrinsicType('i8')
-    ns['i16'] = model.IntrinsicType('i16')
-    ns['i32'] = model.IntrinsicType('i32')
-    ns['f32'] = model.IntrinsicType('f32')
-    ns['f64'] = model.IntrinsicType('f64')
-
+    for name in ['bool', 'i8', 'i16', 'i32', 'i64', 'u8', 'u16', 'u32', 'u64', 'f32', 'f64']:
+        ns[name] = model.IntrinsicType(name)
     ns['string'] = model.IntrinsicType('string')
 
     # Create objects
