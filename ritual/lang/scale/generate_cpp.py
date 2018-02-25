@@ -370,7 +370,25 @@ class GenerateSource(object):
 
             # Default constructor.
             # TODO zero value initialization?
-            gen.out.write(name).write('() {}\n\n')
+            gen.out.write(name).write('()')
+            dirty = False
+            for f in node.fields:
+                if isinstance(f.t, model.IntegerType):
+                    zero = '0'
+                elif isinstance(f.t, model.FloatType):
+                    zero = '0'
+                elif f.t.name == 'bool':
+                    zero = 'false'
+                else:
+                    continue
+                if dirty:
+                    gen.out.write(', ')
+                else:
+                    gen.out.write(' : ')
+                gen.out.write(f.name).write('(').write(zero).write(')')
+                dirty = True
+
+            gen.out.write(' {}\n\n')
 
 
 
