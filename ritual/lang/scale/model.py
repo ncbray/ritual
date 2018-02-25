@@ -12,6 +12,16 @@ class IntrinsicType(object):
     __schema__ = 'name:string'
 
 
+class IntegerType(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'name:string width:int unsigned:bool'
+
+
+class FloatType(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'name:string width:int'
+
+
 class TupleType(object):
     __metaclass__ = TreeMeta
     __schema__ = 'children:[]Type'
@@ -37,7 +47,7 @@ class PoisonType(object):
     __schema__ = ''
 
 
-Type = (IntrinsicType, ModuleType, TupleType, FunctionType, Struct, PoisonType)
+Type = (IntrinsicType, IntegerType, FloatType, ModuleType, TupleType, FunctionType, Struct, PoisonType)
 
 
 class GetLocal(object):

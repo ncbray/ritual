@@ -32,44 +32,50 @@ class Generator(object):
 
 INTRINSIC_MAP = {}
 INTRINSIC_MAP['bool'] = 'bool'
-for sz in [8, 16, 32]:
-    INTRINSIC_MAP['i%d' % sz] = 'int%d_t' % sz
-    INTRINSIC_MAP['u%d' % sz] = 'uint%d_t' % sz
-INTRINSIC_MAP['f32'] = 'float'
-INTRINSIC_MAP['f64'] = 'double'
 INTRINSIC_MAP['string'] = 'std::string'
 
 
 class GenerateTypeRef(object):
     __metaclass__ = TypeDispatcher
 
+    @dispatch(model.IntegerType)
+    def visitIntegerType(cls, node, gen):
+        if node.unsigned:
+            return 'uint%d_t' % node.width
+        else:
+            return 'int%d_t' % node.width
+
+    @dispatch(model.FloatType)
+    def visitFloatType(cls, node, gen):
+        if node.width == 32:
+            return 'float'
+        elif node.width == 64:
+            return 'double'
+        else:
+            assert False, node
+
     @dispatch(model.IntrinsicType)
     def visitIntrinsicType(cls, node, gen):
-        gen.out.write(INTRINSIC_MAP[node.name])
+        return INTRINSIC_MAP[node.name]
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
+        name = gen.get_name(node)
         if node.is_ref:
-            gen.out.write('std::shared_ptr<').write(gen.get_name(node)).write('>')
+            return 'std::shared_ptr<%s>' % name
         else:
-            gen.out.write(gen.get_name(node))
+            return name
 
     @dispatch(model.TupleType)
     def visitTupleType(cls, node, gen):
         if not node.children:
-            gen.out.write('void')
-            return
-        gen.out.write('std::tuple<')
-        cls.visit(node.children[0], gen)
-        for child in node.children[1:]:
-            gen.out.write(', ')
-            cls.visit(child, gen)
-        gen.out.write('>')
+            return 'void'
+        children = [cls.visit(child, gen) for child in node.children]
+        return 'std::tuple<%s>' % ', '.join(children)
 
 
 def gen_param(p, gen):
-    GenerateTypeRef.visit(p.t, gen)
-    gen.out.write(' ').write(p.name)
+    gen.out.write(GenerateTypeRef.visit(p.t, gen)).write(' ').write(p.name)
 
 
 def gen_params(params, gen):
@@ -93,8 +99,7 @@ class GenerateDeclarations(object):
     def visitFunction(cls, node, gen):
         if not isinstance(node, model.ExternFunction):
             gen.out.write('static ')
-        GenerateTypeRef.visit(node.t.rt, gen)
-        gen.out.write(' ').write(gen.get_name(node)).write('(')
+        gen.out.write(GenerateTypeRef.visit(node.t.rt, gen)).write(' ').write(gen.get_name(node)).write('(')
         gen_params(node.params, gen)
         gen.out.write(');\n')
 
@@ -240,10 +245,13 @@ class GenerateExpr(object):
     def visitBinaryOp(cls, node, used, gen):
         left = gen_arg(node.left, gen)
         right = gen_arg(node.right, gen)
-        expr = '%s %s %s' % (left, node.op, right)
-        # Small ints are automatically upcasted, make sure they stay the same size.
-        if node.t.name in ['u8', 'i8', 'u16', 'i16'] and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
-            expr = '(%s)(%s)' % (INTRINSIC_MAP[node.t.name], expr)
+        # Small ints are automatically upcasted to "int", make sure they stay the same size and signedness.
+        if isinstance(node.t, model.IntegerType) and node.t.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
+            t = GenerateTypeRef.visit(node.t, gen)
+            tmp = 'unsigned int' if node.t.unsigned else 'int'
+            expr = '(%s)((%s)%s %s (%s)%s)' % (t, tmp, left, node.op, tmp, right)
+        else:
+            expr = '%s %s %s' % (left, node.op, right)
         return expr, True
 
     @dispatch(model.If)
@@ -251,8 +259,7 @@ class GenerateExpr(object):
         tmp = None
         if used:
             tmp = gen.alloc_temp()
-            GenerateTypeRef.visit(node.rt, gen)
-            gen.out.write(' ').write(tmp).write(';\n')
+            gen.out.write(GenerateTypeRef.visit(node.rt, gen)).write(' ').write(tmp).write(';\n')
 
         cond, _ = cls.visit(node.cond, True, gen)
         gen.out.write('if (%s) {\n' % cond)
@@ -307,15 +314,13 @@ class GenerateSource(object):
         for lcl in lcls:
             if lcl in skip:
                 continue
-            GenerateTypeRef.visit(lcl.t, gen)
-            gen.out.write(' ').write(lcl.name).write(';\n')
+            gen.out.write(GenerateTypeRef.visit(lcl.t, gen)).write(' ').write(lcl.name).write(';\n')
 
     @dispatch(model.Function)
     def visitFunction(cls, node, gen):
         gen.tmp_id = 0
         gen.out.write('\n')
-        gen.out.write('static ')
-        GenerateTypeRef.visit(node.t.rt, gen)
+        gen.out.write('static ').write(GenerateTypeRef.visit(node.t.rt, gen))
         gen.out.write(' ').write(gen.get_name(node)).write('(')
         gen_params(node.params, gen)
         gen.out.write(') {\n')
@@ -335,8 +340,7 @@ class GenerateSource(object):
 
     @dispatch(model.Field)
     def visitField(cls, node, gen):
-        GenerateTypeRef.visit(node.t, gen)
-        gen.out.write(' ').write(node.name).write(';\n')
+        gen.out.write(GenerateTypeRef.visit(node.t, gen)).write(' ').write(node.name).write(';\n')
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
@@ -353,8 +357,7 @@ class GenerateSource(object):
             for i, f in enumerate(node.fields):
                 if i != 0:
                     gen.out.write(', ')
-                GenerateTypeRef.visit(f.t, gen)
-                gen.out.write(' ').write(f.name)
+                gen.out.write(GenerateTypeRef.visit(f.t, gen)).write(' ').write(f.name)
             gen.out.write(') : ')
 
             # Initializers

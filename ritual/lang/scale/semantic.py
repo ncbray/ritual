@@ -609,9 +609,15 @@ def process(modules, status):
 
     ns = semantic.builtins
     ns['bool'] = model.IntrinsicType('bool')
-    for name in ['bool', 'i8', 'i16', 'i32', 'i64', 'u8', 'u16', 'u32', 'u64', 'f32', 'f64']:
-        ns[name] = model.IntrinsicType(name)
     ns['string'] = model.IntrinsicType('string')
+    for w in [8, 16, 32, 64]:
+        name = 'i%d' % w
+        ns[name] = model.IntegerType(name, w, False)
+        name = 'u%d' % w
+        ns[name] = model.IntegerType(name, w, True)
+    for w in [32, 64]:
+        name = 'f%d' % w
+        ns[name] = model.FloatType(name, w)
 
     # Create objects
     p = model.Program()
