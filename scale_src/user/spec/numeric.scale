@@ -19,7 +19,7 @@ test "u8 overflow" {
 }
 
 test "u16 overflow" {
-    std.assert(61441u16 * 61441u16 == 57345u16)
+    std.assert(0xf001u16 * 0xf001u16 == 0xe001u16)
 }
 
 test "i32 compare" {

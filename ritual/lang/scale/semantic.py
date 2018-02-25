@@ -237,6 +237,14 @@ class PrintableTypeName(object):
     def visitIntrinsicType(cls, node):
         return node.name
 
+    @dispatch(model.IntegerType)
+    def visitIntegerType(cls, node):
+        return node.name
+
+    @dispatch(model.FloatType)
+    def visitFloatType(cls, node):
+        return node.name
+
     @dispatch(model.Struct)
     def visitStruct(cls, node):
         return node.name
@@ -381,22 +389,28 @@ class ResolveCode(object):
     @dispatch(parser.IntLiteral)
     def visitIntLiteral(cls, node, used, semantic):
         loc = node.loc
-        # TODO error handling.
-        value = int(node.text, node.base)
         t = semantic.builtins[node.postfix]
+        value = int(node.text, node.base)
+
         if t.name.startswith('f'):
             return model.FloatLiteral(loc, value), t
         else:
+            # Need to be a little conservative because we don't know if it's a negative literal or not.
+            bits = t.width if t.unsigned else t.width - 1
+            if value > 2**bits:
+                semantic.status.error('literal of type %s is out of range' % PrintableTypeName.visit(t), loc)
+                return POISON_EXPR, t
             return model.IntLiteral(loc, value), t
 
     @dispatch(parser.FloatLiteral)
     def visitFloatLiteral(cls, node, used, semantic):
         loc = node.loc
+        t = semantic.builtins[node.postfix]
+        assert t.name.startswith('f'), t
         # TODO error handling.
         text = node.text
         value = float(node.text)
         # TODO flexible types?
-        t = semantic.builtins[node.postfix]
         return model.FloatLiteral(loc, text, value), t
 
 

@@ -168,7 +168,8 @@ func float_literal():FloatLiteral {
 }
 
 func int_literal():IntLiteral {
-    /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10, number_postfix()|"i32"}
+    /l=loc "0x" text=<hex_digit+>/; IntLiteral{l, text, 16, number_postfix()|"i32"}
+    | /l=loc text=<[0-9]+>/; IntLiteral{l, text, 10, number_postfix()|"i32"}
 }
 
 func escape_char():rune {
