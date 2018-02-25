@@ -54,7 +54,12 @@ def get_loaded_python_files(files):
     for name, m in sys.modules.iteritems():
         if not m or not hasattr(m, '__file__'):
             continue
-        files.add(m.__file__)
+        fn = m.__file__
+        if fn.endswith('.pyc') or fn.endswith('.pyo'):
+            src = fn[:-1]
+            if os.path.exists(src):
+                fn = src
+        files.add(fn)
 
 
 def main():
