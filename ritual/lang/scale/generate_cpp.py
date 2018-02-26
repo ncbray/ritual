@@ -483,6 +483,8 @@ def sort_structs(pending):
             else:
                 out.append(s)
                 done.add(s)
+        # Recursive value types?
+        assert len(pending) != len(defer), pending
         pending = defer
     return out
 

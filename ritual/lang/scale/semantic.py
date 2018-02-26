@@ -618,6 +618,35 @@ class ResolveCode(object):
                 cls.visit(decl, module, semantic)
 
 
+def check_for_type_loops(p, status):
+    def check_struct(s):
+        if s in started:
+            if s not in completed:
+                l = len(stack)
+                for i in range(l-1, -1, -1):
+                    f = stack[i]
+                    if f.owner == s:
+                        break
+                print i
+                status.error("structure embedding is recursive", s.loc, [f.loc for f in stack[i:]])
+            return
+        else:
+            started.add(s)
+            for f in s.fields:
+                if isinstance(f.t, model.Struct) and not f.t.is_ref:
+                    stack.append(f)
+                    check_struct(f.t)
+                    stack.pop()
+            completed.add(s)
+
+    started = set()
+    completed = set()
+    stack = []
+    for m in p.modules:
+        for s in m.structs:
+            check_struct(s)
+
+
 def process(modules, status):
     semantic = SemanticPass(status)
 
@@ -654,6 +683,9 @@ def process(modules, status):
     for m in modules:
         module = semantic.modules[m.name]
         ResolveCode.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    check_for_type_loops(p, status)
     status.halt_if_errors()
 
     return p
