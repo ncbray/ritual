@@ -2,10 +2,7 @@ repo_root = ..
 scale_src = $repo_root/scale_src
 libscale_dir = $repo_root/libscale
 
-flags = -O1 -Werror -Wall
-# -fsanitize=address -fno-omit-frame-pointer
-# -fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti -fno-math-errno -fmerge-all-constants -fno-ident
-
+flags = -O1 -Werror -Wall -g -fno-omit-frame-pointer -fsanitize=address,undefined
 
 rule compile_cpp
   command = clang++ $flags -std=c++14 -c $in -o $out -MD -MF $out.d
@@ -22,7 +19,7 @@ rule compile_scale
   restat = 1
 
 rule run
-  command = ./$in && touch $out
+  command = $env ./$in && touch $out
   pool = console
 
 build generated.cc: compile_scale
@@ -34,3 +31,4 @@ build runtime.o: compile_cpp $libscale_dir/runtime.cc
 build generated: link generated.o runtime.o
 
 build test.stamp: run generated
+  env = UBSAN_OPTIONS=print_stacktrace=1
