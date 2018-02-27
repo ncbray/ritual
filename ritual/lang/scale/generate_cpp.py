@@ -260,16 +260,8 @@ class GenerateExpr(object):
         if used:
             tmp = gen.alloc_temp()
             gen.out.write(GenerateTypeRef.visit(node.rt, gen)).write(' ').write(tmp).write(';\n')
-
-        cond, _ = cls.visit(node.cond, True, gen)
-        gen.out.write('if (%s) {\n' % cond)
-        with gen.out.block():
-            gen_capture(node.t, tmp, gen)
-        gen.out.write('} else {\n')
-        with gen.out.block():
-            gen_capture(node.f, tmp, gen)
-        gen.out.write('}\n')
-        return tmp, True
+        gen_if(node, tmp, gen)
+        return tmp, False
 
     @dispatch(model.While)
     def visitWhile(cls, node, used, gen):
@@ -283,6 +275,10 @@ class GenerateExpr(object):
         return None, True
 
 
+def is_nop(node):
+    return isinstance(node, model.Sequence) and not node.children
+
+
 def gen_arg(node, gen):
     expr, impure = GenerateExpr.visit(node, True, gen)
     if impure:
@@ -293,10 +289,25 @@ def gen_arg(node, gen):
         return expr
 
 
+def gen_if(node, target, gen):
+    cond, _ = GenerateExpr.visit(node.cond, True, gen)
+    gen.out.write('if (%s) {\n' % cond)
+    with gen.out.block():
+        gen_capture(node.t, target, gen)
+    if not is_nop(node.f):
+        gen.out.write('} else {\n')
+        with gen.out.block():
+            gen_capture(node.f, target, gen)
+    gen.out.write('}\n')
+
+
 def gen_capture(node, target, gen):
     if target:
-        expr, _ = GenerateExpr.visit(node, True, gen)
-        gen.out.write('%s = %s;\n' % (target, expr))
+        if isinstance(node, model.If):
+            gen_if(node, target, gen)
+        else:
+            expr, _ = GenerateExpr.visit(node, True, gen)
+            gen.out.write('%s = %s;\n' % (target, expr))
     else:
         gen_void(node, gen)
 
