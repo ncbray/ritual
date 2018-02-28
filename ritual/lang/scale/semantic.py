@@ -167,6 +167,19 @@ class ResolveType(object):
         return obj
 
 
+def struct_lookup(s, name):
+    while s:
+        if name in s.namespace:
+            return s.namespace[name]
+        s = s.parent
+    return None
+
+
+def all_fields(s):
+    parent_fields = all_fields(s.parent) if s.parent else []
+    return parent_fields + s.fields
+
+
 class ResolveSignatures(object):
     __metaclass__ = TypeDispatcher
 
@@ -194,13 +207,18 @@ class ResolveSignatures(object):
     @dispatch(parser.StructDecl)
     def visitStructDecl(cls, node, module, semantic):
         s = module.namespace[node.name.text]
+        parent = None
+        if not isinstance(node.parent, parser.NoTypeRef):
+            parent = ResolveType.visit(node.parent, semantic)
+            s.parent = parent
         fields = []
         for fd in node.fields:
             loc = fd.name.loc
             name = fd.name.text
             f = model.Field(loc, name, ResolveType.visit(fd.t, semantic), s)
             fields.append(f)
-            if name in s.namespace:
+
+            if struct_lookup(s, name):
                 semantic.status.error('tried to redefine "%s"' % name, loc)
             s.namespace[name] = f
         s.fields = fields
@@ -328,7 +346,7 @@ class ResolveAssignmentTarget(object):
         if isinstance(t, model.PoisonType):
             return POISON_TARGET
         elif isinstance(t, model.Struct):
-            f = t.namespace.get(name)
+            f = struct_lookup(t, name)
             if f is None:
                 semantic.status.error('cannot set attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
                 return POISON_TARGET
@@ -413,7 +431,6 @@ class ResolveCode(object):
         # TODO flexible types?
         return model.FloatLiteral(loc, text, value), t
 
-
     @dispatch(parser.StringLiteral)
     def visitStringLiteral(cls, node, used, semantic):
         return model.StringLiteral(node.loc, node.value), semantic.builtins['string']
@@ -445,7 +462,7 @@ class ResolveCode(object):
                 return POISON_EXPR, POISON_TYPE
             return wrap_obj(loc, obj)
         elif isinstance(t, model.Struct):
-            f = t.namespace.get(name)
+            f = struct_lookup(t, name)
             if f is None:
                 semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
                 return POISON_EXPR, POISON_TYPE
@@ -469,27 +486,28 @@ class ResolveCode(object):
             # TODO overloads?
             params = et.params
             if len(params) != arg_count:
-                semantic.status.error('expected %d arguments, got %d' % (len(params), arg_count, loc))
+                semantic.status.error('expected %d arguments, got %d' % (len(params), arg_count), loc)
                 return POISON_EXPR, POISON_TYPE
 
             for i in range(arg_count):
                 pt = et.params[i]
                 ae = arg_exprs[i]
                 at = arg_types[i]
-                check_can_hold(ae.loc, pt, at, semantic)
+                if not isinstance(ae, model.PoisonExpr):
+                    check_can_hold(ae.loc, pt, at, semantic)
 
             if isinstance(expr, model.GetFunction):
                 return model.DirectCall(loc, expr.f, arg_exprs), et.rt
             else:
                 assert False, expr
         elif isinstance(et, model.Struct):
-            fields = et.fields
+            fields = all_fields(et)
             if len(fields) != arg_count:
-                semantic.status.error('expected %d arguments, got %d' % (len(fields), arg_count, loc))
+                semantic.status.error('expected %d arguments, got %d' % (len(fields), arg_count), loc)
                 return POISON_EXPR, POISON_TYPE
             
             for i in range(arg_count):
-                pt = et.fields[i].t
+                pt = fields[i].t
                 ae = arg_exprs[i]
                 at = arg_types[i]
                 check_can_hold(ae.loc, pt, at, semantic)

@@ -11,6 +11,14 @@ struct Vec3 {
     z:f32;
 }
 
+class Base {
+    a:i32;
+}
+
+class Child : Base {
+    b:i32;
+}
+
 test "struct constructor" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
@@ -53,13 +61,19 @@ test "deep copy" {
     std.assert(2.0 == bun.b.y)
 }
 
+test "inherit" {
+    let obj = Child(1, 2);
+    std.assertEqualI32(obj.a, 1);
+    std.assertEqualI32(obj.b, 2)
+}
+
 class Holder {
     value:i32;
 }
 
 test "class constructor" {
     let h = Holder(7);
-    std.assertEqualI32(h.value,  7)
+    std.assertEqualI32(h.value, 7)
 }
 
 test "class alias" {

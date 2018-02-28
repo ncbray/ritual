@@ -39,7 +39,7 @@ class Field(object):
 
 class Struct(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string is_ref:bool module:Module fields:[]Field@[no_init] namespace:OrderedDict@[simple_init]'
+    __schema__ = 'loc:int name:string is_ref:bool module:Module parent:?Struct@[backedge, no_init] fields:[]Field@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class PoisonType(object):

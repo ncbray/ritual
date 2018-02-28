@@ -98,7 +98,12 @@ struct ListTypeRef {
     t:TypeRef
 }
 
-union TypeRef = NamedTypeRef | ListTypeRef;
+// HACK
+// TODO: support null.
+struct NoTypeRef {
+}
+
+union TypeRef = NamedTypeRef | ListTypeRef | NoTypeRef;
 
 
 struct Param {
@@ -121,6 +126,7 @@ struct FieldDecl {
 struct StructDecl {
     name:Token
     is_ref:bool
+    parent:TypeRef
     fields:[]FieldDecl
 }
 
@@ -349,10 +355,12 @@ func field_decl():FieldDecl {
 
 func struct_decl():StructDecl {
     is_ref=(/"struct"/; false | /"class"/; true);
-    /end_of_keyword S name=ident S "{" S/;
+    /end_of_keyword S name=ident S/;
+    (/":" S parent=type_ref S/ | parent=NoTypeRef{});
+    /"{" S/;
     fields=[]FieldDecl{};
     /(fields<<field_decl (S fields<<field_decl)*)? S "}"/;
-    StructDecl{name, is_ref, fields}
+    StructDecl{name, is_ref, parent, fields}
 }
 
 func test_decl():TestDecl {

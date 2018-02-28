@@ -388,25 +388,43 @@ class GenerateSource(object):
     def visitStruct(cls, node, gen):
         name = gen.get_name(node)
         gen.out.write('\n')
-        gen.out.write('struct ').write(name).write(' {\n')
+        gen.out.write('struct ').write(name)
+        if node.parent:
+            gen.out.write(' : public ').write(gen.get_name(node.parent))
+        gen.out.write(' {\n')
         with gen.out.block():
 
-            if len(node.fields) == 1:
+            parent_fields = []
+            current = node.parent
+            while current:
+                parent_fields = current.fields + parent_fields
+                current = current.parent
+            local_fields = node.fields
+            all_fields = parent_fields + local_fields
+
+            if len(all_fields) == 1:
                 gen.out.write('explicit ')
             gen.out.write(name).write('(')
 
             # Arguments
-            for i, f in enumerate(node.fields):
+            for i, f in enumerate(all_fields):
                 if i != 0:
                     gen.out.write(', ')
                 gen.out.write(GenerateTypeRef.visit(f.t, gen)).write(' ').write(f.name)
             gen.out.write(') : ')
 
             # Initializers
-            for i, f in enumerate(node.fields):
-                if i != 0:
+            dirty = False
+            if node.parent:
+                gen.out.write(gen.get_name(node.parent)).write('(')
+                gen.out.write(', '.join([f.name for f in parent_fields]))
+                gen.out.write(')')
+                dirty = True
+            for f in local_fields:
+                if dirty:
                     gen.out.write(', ')
                 gen.out.write(f.name).write('(').write(f.name).write(')')
+                dirty = True
 
             gen.out.write(' {}\n\n')
 
@@ -414,7 +432,10 @@ class GenerateSource(object):
             # TODO zero value initialization?
             gen.out.write(name).write('()')
             dirty = False
-            for f in node.fields:
+            if node.parent:
+                gen.out.write(' : ').write(gen.get_name(node.parent)).write('()')
+                dirty = True
+            for f in local_fields:
                 if isinstance(f.t, model.IntegerType):
                     zero = '0'
                 elif isinstance(f.t, model.FloatType):
@@ -431,8 +452,6 @@ class GenerateSource(object):
                 dirty = True
 
             gen.out.write(' {}\n\n')
-
-
 
             for f in node.fields:
                 cls.visit(f, gen)
