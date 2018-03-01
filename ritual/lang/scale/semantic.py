@@ -167,6 +167,35 @@ class ResolveType(object):
         return obj
 
 
+class ResolveInheritance(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.ImportDecl, parser.TestDecl, parser.FuncDecl, parser.ExternFuncDecl)
+    def visitLeaf(cls, node, module, semantic):
+        pass
+
+    @dispatch(parser.StructDecl)
+    def visitStructDecl(cls, node, module, semantic):
+        s = module.namespace[node.name.text]
+        loc = s.loc
+        if not isinstance(node.parent, parser.NoTypeRef):
+            parent = ResolveType.visit(node.parent, semantic)
+            if isinstance(parent, model.Struct):
+                s.parent = parent
+            elif isinstance(parent, model.PoisonType):
+                pass
+            else:
+                semantic.status.error('cannot inherit from %s' % PrintableTypeName.visit(parent), loc)
+            if s.is_ref != parent.is_ref:
+                semantic.status.error('mismatched inheritance or ref type vs. value type', loc, [parent.loc])
+
+    @dispatch(parser.Module)
+    def visitModule(cls, node, module, semantic):
+        with semantic.namespace(module.namespace):
+            for decl in node.decls:
+                cls.visit(decl, module, semantic)
+
+
 def struct_lookup(s, name):
     while s:
         if name in s.namespace:
@@ -303,6 +332,7 @@ def can_hold(a, b):
                 return False
         return True
     return False
+
 
 def check_can_hold(loc, a, b, semantic):
     assert isinstance(loc, int), loc
@@ -643,13 +673,19 @@ def check_for_type_loops(p, status):
                 l = len(stack)
                 for i in range(l-1, -1, -1):
                     f = stack[i]
-                    if f.owner == s:
+                    if f is s or isinstance(f, model.Field) and f.owner is s:
                         break
-                print i
                 status.error("structure embedding is recursive", s.loc, [f.loc for f in stack[i:]])
             return
         else:
             started.add(s)
+            # Inheritance is essentially embedding.
+            p = s.parent
+            if p:
+                stack.append(s)
+                check_struct(p)
+                stack.pop()
+            # Fields
             for f in s.fields:
                 if isinstance(f.t, model.Struct) and not f.t.is_ref:
                     stack.append(f)
@@ -695,15 +731,25 @@ def process(modules, status):
 
     for m in modules:
         module = semantic.modules[m.name]
+        ResolveInheritance.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    # Evaluate without fields to check for inheritance loops.
+    # Inheritance loops can make field lookups hang.
+    check_for_type_loops(p, status)
+    status.halt_if_errors()
+
+    for m in modules:
+        module = semantic.modules[m.name]
         ResolveSignatures.visit(m, module, semantic)
+    status.halt_if_errors()
+
+    check_for_type_loops(p, status)
     status.halt_if_errors()
 
     for m in modules:
         module = semantic.modules[m.name]
         ResolveCode.visit(m, module, semantic)
-    status.halt_if_errors()
-
-    check_for_type_loops(p, status)
     status.halt_if_errors()
 
     return p
