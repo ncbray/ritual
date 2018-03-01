@@ -11,12 +11,16 @@ struct Vec3 {
     z:f32;
 }
 
-class Base {
-    a:i32;
+class Child : Inbetween {
+    c:i32;
 }
 
-class Child : Base {
+class Inbetween: Base {
     b:i32;
+}
+
+class Base {
+    a:i32;
 }
 
 test "struct constructor" {
@@ -62,9 +66,10 @@ test "deep copy" {
 }
 
 test "inherit" {
-    let obj = Child(1, 2);
+    let obj = Child(1, 2, 3);
     std.assertEqualI32(obj.a, 1);
-    std.assertEqualI32(obj.b, 2)
+    std.assertEqualI32(obj.b, 2);
+    std.assertEqualI32(obj.c, 3)
 }
 
 class Holder {

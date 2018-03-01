@@ -537,6 +537,9 @@ def sort_structs(pending):
     while pending:
         defer = []
         for s in pending:
+            if s.parent and s.parent not in done:
+                defer.append(s)
+                continue
             for f in s.fields:
                 if isinstance(f.t, model.Struct) and f.t not in done:
                     defer.append(s)
