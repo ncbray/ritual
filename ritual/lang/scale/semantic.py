@@ -321,6 +321,9 @@ def can_hold(a, b):
         return True
     if isinstance(a, model.PoisonType) or isinstance(b, model.PoisonType):
         return True
+    if isinstance(a, model.Struct) and isinstance(b, model.Struct):
+        if b.parent:
+            return can_hold(a, b.parent)
     if isinstance(a, model.IntrinsicType) and isinstance(b, model.IntrinsicType):
         return a.name == b.name
     if isinstance(a, model.TupleType) and isinstance(b, model.TupleType):
@@ -332,6 +335,27 @@ def can_hold(a, b):
                 return False
         return True
     return False
+
+
+def flatten_inheritance(s):
+    if s.parent:
+        return flatten_inheritance(s.parent) + [s]
+    else:
+        return [s]
+
+def unify_types(a, b):
+    if a is b:
+        return a
+    if isinstance(a, model.Struct) and isinstance(b, model.Struct):
+        ai = flatten_inheritance(a)
+        bi = flatten_inheritance(b)
+        prev = None
+        for ap, bp in zip(ai, bi):
+            if ap is not bp:
+                break
+            prev = ap
+        return prev
+    return None
 
 
 def check_can_hold(loc, a, b, semantic):
@@ -611,13 +635,11 @@ class ResolveCode(object):
             t = VOID_TYPE
         elif tt == POISON_TYPE or ft == POISON_TYPE:
             t = POISON_TYPE
-        elif can_hold(tt, ft):
-            t = tt
-        elif can_hold(ft, tt):
-            t = ft
         else:
-            semantic.status.error('cannot unify types %s and %s' % (PrintableTypeName.visit(tt), PrintableTypeName.visit(ft)), loc)
-            t = POISON_TYPE
+            t = unify_types(tt, ft)
+            if t is None:
+                semantic.status.error('cannot unify types %s and %s' % (PrintableTypeName.visit(tt), PrintableTypeName.visit(ft)), loc)
+                t = POISON_TYPE
 
         return model.If(loc, cond, te, fe, t), t
 

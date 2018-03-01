@@ -11,18 +11,6 @@ struct Vec3 {
     z:f32;
 }
 
-class Child : Inbetween {
-    c:i32;
-}
-
-class Inbetween: Base {
-    b:i32;
-}
-
-class Base {
-    a:i32;
-}
-
 test "struct constructor" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
@@ -70,6 +58,31 @@ test "inherit" {
     std.assertEqualI32(obj.a, 1);
     std.assertEqualI32(obj.b, 2);
     std.assertEqualI32(obj.c, 3)
+}
+
+class Child : Inbetween {
+    c:i32;
+}
+
+class Inbetween: Base {
+    b:i32;
+}
+
+class Base {
+    a:i32;
+}
+
+fn type_merge(cond:bool) -> Base {
+    if cond {
+        Child(3, 2, 1)
+    } else {
+        Inbetween(2, 1)
+    }
+}
+
+test "inherit merge" {
+    std.assertEqualI32(type_merge(true).a, 3);
+    std.assertEqualI32(type_merge(false).a, 2)
 }
 
 class Holder {

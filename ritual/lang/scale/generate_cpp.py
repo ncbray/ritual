@@ -453,6 +453,9 @@ class GenerateSource(object):
 
             gen.out.write(' {}\n\n')
 
+            # Tracing destructor.
+            #gen.out.write('~').write(name).write('() {std::cout << "    destroy %s" << std::endl;}\n' % name)
+
             for f in node.fields:
                 cls.visit(f, gen)
         gen.out.write('};\n')
