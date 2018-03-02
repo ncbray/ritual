@@ -15,14 +15,14 @@ test "struct constructor" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
     std.assert(2.0 == v.y);
-    std.assert(3.0 == v.z)
+    std.assert(3.0 == v.z);
 }
 
 test "struct setter" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
     v.x = 7.0;
-    std.assert(7.0 == v.x)
+    std.assert(7.0 == v.x);
 }
 
 test "struct copy" {
@@ -30,7 +30,7 @@ test "struct copy" {
     let b = a;
     b.x = 4.0;
     std.assert(1.0 == a.x);
-    std.assert(4.0 == b.x)
+    std.assert(4.0 == b.x);
 }
 
 test "compound constructor" {
@@ -40,7 +40,7 @@ test "compound constructor" {
     std.assert(3.0 == bun.a.z);
     std.assert(4.0 == bun.b.x);
     std.assert(5.0 == bun.b.y);
-    std.assert(6.0 == bun.b.z)
+    std.assert(6.0 == bun.b.z);
 }
 
 test "deep copy" {
@@ -50,14 +50,14 @@ test "deep copy" {
     std.assert(7.0 == bun.a.x);
     std.assert(2.0 == bun.a.y);
     std.assert(1.0 == bun.b.x);
-    std.assert(2.0 == bun.b.y)
+    std.assert(2.0 == bun.b.y);
 }
 
 test "inherit" {
     let obj = Child(1, 2, 3);
     std.assertEqualI32(obj.a, 1);
     std.assertEqualI32(obj.b, 2);
-    std.assertEqualI32(obj.c, 3)
+    std.assertEqualI32(obj.c, 3);
 }
 
 class Child : Inbetween {
@@ -82,7 +82,7 @@ fn type_merge(cond:bool) -> Base {
 
 test "inherit merge" {
     std.assertEqualI32(type_merge(true).a, 3);
-    std.assertEqualI32(type_merge(false).a, 2)
+    std.assertEqualI32(type_merge(false).a, 2);
 }
 
 class Holder {
@@ -98,5 +98,5 @@ test "class alias" {
     let h1 = Holder(7);
     let h2 = h1;
     h1.value = 11;
-    std.assertEqualI32(h2.value, 11)
+    std.assertEqualI32(h2.value, 11);
 }

@@ -2,7 +2,7 @@ import std;
 
 test "bool neg" {
     std.assert(!false);
-    std.assert(!!true)
+    std.assert(!!true);
 }
 
 test "bool compare" {
@@ -11,7 +11,7 @@ test "bool compare" {
     std.assert(false != true);
     std.assert(false == false);
     std.assert(true == !false);
-    std.assert(!true == false)
+    std.assert(!true == false);
 }
 
 test "u8 overflow" {
@@ -19,7 +19,7 @@ test "u8 overflow" {
 }
 
 test "u16 overflow" {
-    std.assert(0xf001u16 * 0xf001u16 == 0xe001u16)
+    std.assert(0xf001u16 * 0xf001u16 == 0xe001u16);
 }
 
 test "i32 compare" {
@@ -30,16 +30,16 @@ test "i32 compare" {
     std.assert(2 <= 2);
     std.assert(2 > 1);
     std.assert(2 >= 1);
-    std.assert(2 >= 2)
+    std.assert(2 >= 2);
 }
 
 test "i32 neg simple" {
     let v = 7;
-    std.assert(-v  < -6)
+    std.assert(-v  < -6);
 }
 
 test "i32 neg prec" {
-    std.assertEqualI32(-(2+3), -5)
+    std.assertEqualI32(-(2+3), -5);
 }
 
 test "i32 add" {
@@ -51,14 +51,14 @@ test "i32 mul" {
     std.assertEqualI32(3 * 7, 21);
     std.assertEqualI32(-3 * 7, -21);
     std.assertEqualI32(3 * -7, -21);
-    std.assertEqualI32(-3 * -7, 21)
+    std.assertEqualI32(-3 * -7, 21);
 }
 
 test "i32 div" {
     std.assertEqualI32(7 / 2, 3);
     std.assertEqualI32(-7 / 2, -3);
     std.assertEqualI32(7 / -2, -3);
-    std.assertEqualI32(-7 / -2, 3)
+    std.assertEqualI32(-7 / -2, 3);
 }
 
 // NOTE: current a remainder operation - should it be modulo?  ((m % n) + n) % n
@@ -66,7 +66,7 @@ test "i32 mod" {
     std.assertEqualI32(7 % 3, 1);
     std.assertEqualI32(-7 % 3, -1);
     std.assertEqualI32(7 % -3, 1);
-    std.assertEqualI32(-7 % -3, -1)
+    std.assertEqualI32(-7 % -3, -1);
 }
 
 
@@ -78,26 +78,26 @@ test "f32 compare" {
     std.assert(1.1 <= 1.1);
     std.assert(1.1 > 1.0);
     std.assert(1.1 >= 1.0);
-    std.assert(1.1 >= 1.1)
+    std.assert(1.1 >= 1.1);
 }
 
 test "f32 add" {
     std.assert(1.0 + 2.5 == 3.5);
-    std.assert(1.0 - 2.5 == -1.5)
+    std.assert(1.0 - 2.5 == -1.5);
 }
 
 test "f32 mul" {
     std.assert(3.0 * 7.5 == 22.5);
     std.assert(-3.0 * 7.5 == -22.5);
     std.assert(3.0 * -7.5 == -22.5);
-    std.assert(-3.0 * -7.5 == 22.5)
+    std.assert(-3.0 * -7.5 == 22.5);
 }
 
 test "f32 div" {
     std.assert(5.0 / 4.0 == 1.25);
     std.assert(-5.0 / 4.0 == -1.25);
     std.assert(5.0 / -4.0 == -1.25);
-    std.assert(-5.0 / -4.0 == 1.25)
+    std.assert(-5.0 / -4.0 == 1.25);
 }
 
 // TODO: floating point modulus has some subtleties.

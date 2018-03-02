@@ -297,7 +297,8 @@ func expr():Expr {
 }
 
 func expr_or_nothing():Expr {
-    expr_sequence() | Sequence{[]Expr{}}
+    /e=expr_sequence (S ";")?/; e
+    | Sequence{[]Expr{}}
 }
 
 func type_ref():TypeRef {
