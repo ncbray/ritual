@@ -114,8 +114,9 @@ class GenerateTarget(object):
     @dispatch(model.SetField)
     def visitSetField(cls, node, gen):
         prec = 2
-        expr = gen_arg(node.expr, 2, gen)
-        return expr + field_deref(node.field, gen)
+        expr, is_ptr = gen_arg(node.expr, 2, gen)
+        deref = '->' if is_ptr else '.'
+        return expr + deref + node.field.name
 
     @dispatch(model.DestructureTuple)
     def visitDestructureTuple(cls, node, gen):
@@ -179,12 +180,8 @@ def string_literal(s):
     return 'u8"' + ''.join(chars) + '"'
 
 
-def field_deref(f, gen):
-    if f.owner.is_ref:
-        sep = '->'
-    else:
-        sep = '.'
-    return sep + f.name
+def implemented_as_ptr(t):
+    return isinstance(t, model.Struct) and t.is_ref
 
 
 class GenerateExpr(object):
@@ -192,61 +189,71 @@ class GenerateExpr(object):
 
     @dispatch(model.BooleanLiteral)
     def visitBooleanLiteral(cls, node, used, gen):
-        return 'true' if node.value else 'false', 0, False
+        return 'true' if node.value else 'false', 0, False, False
 
     @dispatch(model.IntLiteral)
     def visitIntLiteral(cls, node, used, gen):
-        return repr(node.value), 0, False
+        return repr(node.value), 0, False, False
 
     @dispatch(model.FloatLiteral)
     def visitFloatLiteral(cls, node, used, gen):
-        return node.text, 0, False
+        return node.text, 0, False, False
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, used, gen):
-        return string_literal(node.value), 0, False
+        return string_literal(node.value), 0, False, False
 
     @dispatch(model.Constructor)
     def visitConstructor(cls, node, used, gen):
-        args = [gen_arg(arg, 17, gen) for arg in node.args]
+        args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
         t_name = gen.get_name(node.t)
         if node.t.is_ref:
-            return 'std::make_shared<%s>(%s)' % (t_name, ', '.join(args)), 2, True
+            return 'std::make_shared<%s>(%s)' % (t_name, ', '.join(args)), 2, True, True
         else:
-            return '%s{%s}' % (t_name, ', '.join(args)), 2, True
+            return '%s{%s}' % (t_name, ', '.join(args)), 2, True, False
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
-        args = [gen_arg(arg, 17, gen) for arg in node.args]
+        args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
         func_name = gen.get_name(node.f)
-        return '%s(%s)' % (func_name, ', '.join(args)), 2, True
+        return '%s(%s)' % (func_name, ', '.join(args)), 2, True, implemented_as_ptr(node.f.t.rt)
+
+    @dispatch(model.DirectMethodCall)
+    def visitDirectMethodCall(cls, node, used, gen):
+        expr, is_ptr = gen_arg(node.expr, 2, gen)
+        args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
+        name = node.f.name
+        deref = '->' if is_ptr else '.'
+        return '%s%s%s(%s)' % (expr, deref, name, ', '.join(args)), 2, True, implemented_as_ptr(node.f.t.rt)
+
 
     @dispatch(model.TupleLiteral)
     def visitTupleLiteral(cls, node, used, gen):
         if used:
-            args = [gen_arg(arg, 17, gen) for arg in node.args]
-            return 'std::make_tuple(' + ', '.join(args) + ')', 2, False
+            args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
+            return 'std::make_tuple(' + ', '.join(args) + ')', 2, False, False
         else:
             for arg in node.args:
                 gen_void(arg, gen)
-            return None, 0, False
+            return None, 0, False, False
 
     @dispatch(model.GetLocal)
     def visitGetLocal(cls, node, used, gen):
-        return node.lcl.name, 0, False
+        return node.lcl.name, 0, False, implemented_as_ptr(node.lcl.t) or node.lcl.name == 'this'
 
     @dispatch(model.GetField)
     def visitGetField(cls, node, used, gen):
         prec = 2
-        expr = gen_arg(node.expr, prec, gen)
+        expr, is_ptr = gen_arg(node.expr, prec, gen)
         # TODO: has side effect?
-        return expr + field_deref(node.field, gen), prec, False
+        deref = '->' if is_ptr else '.'
+        return expr + deref + node.field.name, prec, False, implemented_as_ptr(node.field.t)
 
     @dispatch(model.Sequence)
     def visitSeqeunce(cls, node, used, gen):
         if not node.children:
             assert not used
-            return None, True
+            return None, 0, True, False
         for child in node.children[:-1]:
             gen_void(child, gen)
         return cls.visit(node.children[-1], used, gen)
@@ -255,22 +262,22 @@ class GenerateExpr(object):
     def visitAssign(cls, node, used, gen):
         assert not used
         target = GenerateTarget.visit(node.target, gen)
-        value, _, impure = cls.visit(node.value, True, gen)
+        value, _, impure, _ = cls.visit(node.value, True, gen)
         gen.out.write(target + ' = ' + value + ';\n')
-        return None, 0, False
+        return None, 0, False, False
 
     @dispatch(model.PrefixOp)
     def visitPrefixOp(cls, node, used, gen):
         prec = 3
-        expr = gen_arg(node.expr, prec, gen)
+        expr, _ = gen_arg(node.expr, prec, gen)
         # TODO: has side effect?
-        return node.op + expr, prec, False
+        return node.op + expr, prec, False, False
 
     @dispatch(model.BinaryOp)
     def visitBinaryOp(cls, node, used, gen):
         prec = binop_prec[node.op]
-        left = gen_arg(node.left, prec, gen)
-        right = gen_arg(node.right, prec-1, gen)
+        left, _ = gen_arg(node.left, prec, gen)
+        right, _ = gen_arg(node.right, prec-1, gen)
         # Small ints are automatically upcasted to "int", make sure they stay the same size and signedness.
         if isinstance(node.t, model.IntegerType) and node.t.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
             t = GenerateTypeRef.visit(node.t, gen)
@@ -280,7 +287,7 @@ class GenerateExpr(object):
         else:
             expr = '%s %s %s' % (left, node.op, right)
         # TODO: has side effect?
-        return expr, prec, False
+        return expr, prec, False, False
 
     @dispatch(model.If)
     def visitIf(cls, node, used, gen):
@@ -289,18 +296,18 @@ class GenerateExpr(object):
             tmp = gen.alloc_temp()
             gen.out.write(GenerateTypeRef.visit(node.rt, gen)).write(' ').write(tmp).write(';\n')
         gen_if(node, tmp, gen)
-        return tmp, 0, False
+        return tmp, 0, False, implemented_as_ptr(node.rt)
 
     @dispatch(model.While)
     def visitWhile(cls, node, used, gen):
         assert not used
         gen.out.write('while (true) {\n')
         with gen.out.block():
-            cond, _, _ = cls.visit(node.cond, True, gen)
+            cond, _, _, _ = cls.visit(node.cond, True, gen)
             gen.out.write('if (!(%s)) break;\n' % cond)
             gen_void(node.body, gen)
         gen.out.write('}\n')
-        return None, 0, True
+        return None, 0, True, False
 
 
 def is_nop(node):
@@ -308,19 +315,19 @@ def is_nop(node):
 
 
 def gen_arg(node, containing_prec, gen):
-    expr, prec, impure = GenerateExpr.visit(node, True, gen)
+    expr, prec, impure, is_ptr = GenerateExpr.visit(node, True, gen)
     if impure:
         tmp = gen.alloc_temp()
         gen.out.write('auto %s = %s;\n' % (tmp, expr))
-        return tmp
+        return tmp, is_ptr
     else:
         if containing_prec < prec:
             expr = '(%s)' % expr
-        return expr
+        return expr, is_ptr
 
 
 def gen_if(node, target, gen):
-    cond, _, _ = GenerateExpr.visit(node.cond, True, gen)
+    cond, _, _, _ = GenerateExpr.visit(node.cond, True, gen)
     gen.out.write('if (%s) {\n' % cond)
     with gen.out.block():
         gen_capture(node.t, target, gen)
@@ -336,14 +343,14 @@ def gen_capture(node, target, gen):
         if isinstance(node, model.If):
             gen_if(node, target, gen)
         else:
-            expr, _, _ = GenerateExpr.visit(node, True, gen)
+            expr, _, _, _ = GenerateExpr.visit(node, True, gen)
             gen.out.write('%s = %s;\n' % (target, expr))
     else:
         gen_void(node, gen)
 
 
 def gen_void(node, gen):
-    expr, _, impure = GenerateExpr.visit(node, False, gen)
+    expr, _, impure, _ = GenerateExpr.visit(node, False, gen)
     if expr and impure:
         gen.out.write(expr).write(';\n')
 
@@ -360,15 +367,25 @@ class GenerateSource(object):
 
     @dispatch(model.Function)
     def visitFunction(cls, node, gen):
+        is_method = node.self != None
+
         gen.tmp_id = 0
         gen.out.write('\n')
-        gen.out.write('static ').write(GenerateTypeRef.visit(node.t.rt, gen))
-        gen.out.write(' ').write(gen.get_name(node)).write('(')
+        if not is_method:
+            gen.out.write('static ')
+        gen.out.write(GenerateTypeRef.visit(node.t.rt, gen))
+
+        name = node.name if is_method else gen.get_name(node)
+        gen.out.write(' ').write(name).write('(')
         gen_params(node.params, gen)
         gen.out.write(') {\n')
         with gen.out.block():
             # Declare locals
             params = set([p.lcl for p in node.params])
+            if is_method:
+                # HACK
+                node.self.name = 'this'
+                params.add(node.self)
             cls.declare_locals(node.locals, params, gen)
 
             # Generate body
@@ -377,7 +394,7 @@ class GenerateSource(object):
             if is_void:
                 gen_void(node.body, gen)
             else:
-                gen.out.write('return ' + gen_arg(node.body, 16, gen)).write(';\n')
+                gen.out.write('return ' + gen_arg(node.body, 16, gen)[0]).write(';\n')
         gen.out.write('}\n')
 
     @dispatch(model.Field)
@@ -458,6 +475,8 @@ class GenerateSource(object):
 
             for f in node.fields:
                 cls.visit(f, gen)
+            for m in node.methods:
+                cls.visit(m, gen)
         gen.out.write('};\n')
 
     @dispatch(model.Test)

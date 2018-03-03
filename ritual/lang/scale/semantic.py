@@ -113,6 +113,28 @@ class IndexNamespace(object):
         name = node.name.text
         s = model.Struct(loc, name, node.is_ref, module)
         semantic.register(loc, name, s)
+
+        fields = []
+        methods = []
+        for m in node.members:
+            loc = m.name.loc
+            name = m.name.text
+            if name in s.namespace:
+                semantic.status.error('tried to redefine "%s"' % name, loc)
+
+            if isinstance(m, parser.FuncDecl):
+                f = model.Function(loc, name, module)
+                methods.append(f)
+                s.namespace[name] = f
+            elif isinstance(m, parser.FieldDecl):
+                f = model.Field(loc, name, s)
+                fields.append(f)
+                s.namespace[name] = f
+            else:
+                assert False, m
+
+        s.fields = fields
+        s.methods = methods
         return s
 
     @dispatch(parser.ExternFuncDecl)
@@ -212,13 +234,8 @@ def all_fields(s):
 class ResolveSignatures(object):
     __metaclass__ = TypeDispatcher
 
-    @dispatch(parser.ImportDecl, parser.TestDecl)
-    def visitLeaf(cls, node, module, semantic):
-        pass
-
     @dispatch(parser.FuncDecl)
-    def visitFuncDecl(cls, node, module, semantic):
-        f = module.namespace[node.name.text]
+    def visitFuncDecl(cls, node, f, semantic):
         pt = []
         for p in node.params:
             loc = p.name.loc
@@ -234,27 +251,26 @@ class ResolveSignatures(object):
         f.t = make_function_type(pt, rt, semantic)
 
     @dispatch(parser.StructDecl)
-    def visitStructDecl(cls, node, module, semantic):
-        s = module.namespace[node.name.text]
-        parent = None
-        if not isinstance(node.parent, parser.NoTypeRef):
-            parent = ResolveType.visit(node.parent, semantic)
-            s.parent = parent
-        fields = []
-        for fd in node.fields:
-            loc = fd.name.loc
-            name = fd.name.text
-            f = model.Field(loc, name, ResolveType.visit(fd.t, semantic), s)
-            fields.append(f)
+    def visitStructDecl(cls, node, s, semantic):
+        for m in node.members:
+            loc = m.name.loc
+            name = m.name.text
 
-            if struct_lookup(s, name):
-                semantic.status.error('tried to redefine "%s"' % name, loc)
-            s.namespace[name] = f
-        s.fields = fields
+            if s.parent:
+                shadowing = struct_lookup(s.parent, name)
+                if shadowing:
+                    semantic.status.error('"%s" shadows an existing name' % name, loc, [shadowing.loc])
+
+            f = s.namespace[name]
+            if isinstance(m, parser.FuncDecl):
+                cls.visit(m, f, semantic)
+            elif isinstance(m, parser.FieldDecl):
+                f.t = ResolveType.visit(m.t, semantic)
+            else:
+                assert False, m
 
     @dispatch(parser.ExternFuncDecl)
-    def visitExternFuncDecl(cls, node, module, semantic):
-        f = module.namespace[node.name.text]
+    def visitExternFuncDecl(cls, node, f, semantic):
         pt = []
         for p in node.params:
             loc = p.name.loc
@@ -274,7 +290,10 @@ class ResolveSignatures(object):
     def visitModule(cls, node, module, semantic):
         with semantic.namespace(module.namespace):
             for decl in node.decls:
-                cls.visit(decl, module, semantic)
+                if isinstance(decl, (parser.ImportDecl, parser.TestDecl)):
+                    continue
+                obj = module.namespace[decl.name.text]
+                cls.visit(decl, obj, semantic)
 
 
 class PrintableTypeName(object):
@@ -450,10 +469,6 @@ class ResolveCode(object):
             types.append(t)
         return values, types
 
-    @dispatch(parser.ImportDecl, parser.StructDecl)
-    def visitLeaf(cls, node, module, semantic):
-        pass
-
     @dispatch(parser.BooleanLiteral)
     def visitBooleanLiteral(cls, node, used, semantic):
         return model.BooleanLiteral(node.loc, node.value), semantic.builtins['bool']
@@ -520,7 +535,12 @@ class ResolveCode(object):
             if f is None:
                 semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
                 return POISON_EXPR, POISON_TYPE
-            return model.GetField(loc, expr, f), f.t
+            if isinstance(f, model.Field):
+                return model.GetField(loc, expr, f), f.t
+            elif isinstance(f, model.Function):
+                return model.GetMethod(loc, expr, f), f.t
+            else:
+                assert False, f
         else:
             semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
             return POISON_EXPR, POISON_TYPE
@@ -552,6 +572,8 @@ class ResolveCode(object):
 
             if isinstance(expr, model.GetFunction):
                 return model.DirectCall(loc, expr.f, arg_exprs), et.rt
+            elif isinstance(expr, model.GetMethod):
+                return model.DirectMethodCall(loc, expr.expr, expr.func, arg_exprs), et.rt
             else:
                 assert False, expr
         elif isinstance(et, model.Struct):
@@ -651,11 +673,13 @@ class ResolveCode(object):
         return model.While(node.loc, cond, body), VOID_TYPE
 
     @dispatch(parser.FuncDecl)
-    def visitFuncDecl(cls, node, module, semantic):
-        f = module.namespace[node.name.text]
+    def visitFuncDecl(cls, node, f, semantic, struct=None):
         ns = OrderedDict()
         semantic.func = f
         with semantic.namespace(ns):
+            if struct:
+                f.self = semantic.define_lcl(f.loc, 'self', struct)
+
             for p in f.params:
                 p.lcl = semantic.define_lcl(p.loc, p.name, p.t)
 
@@ -681,11 +705,24 @@ class ResolveCode(object):
         semantic.func = None
         module.tests.append(t)
 
+    @dispatch(parser.StructDecl)
+    def visitStruct(cls, node, s, semantic):
+        for m in node.members:
+            if isinstance(m, parser.FuncDecl):
+                f = s.namespace[m.name.text]
+                cls.visit(m, f, semantic, s)
+
     @dispatch(parser.Module)
     def visitModule(cls, node, module, semantic):
         with semantic.namespace(module.namespace):
             for decl in node.decls:
-                cls.visit(decl, module, semantic)
+                if isinstance(decl, parser.ImportDecl):
+                    continue
+                if isinstance(decl, parser.TestDecl):
+                    cls.visit(decl, module, semantic)
+                else:
+                    obj = module.namespace[decl.name.text]
+                    cls.visit(decl, obj, semantic)
 
 
 def check_for_type_loops(p, status):

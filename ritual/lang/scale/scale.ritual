@@ -123,11 +123,13 @@ struct FieldDecl {
     t:TypeRef
 }
 
+union MemberDecl = FieldDecl | FuncDecl;
+
 struct StructDecl {
     name:Token
     is_ref:bool
     parent:TypeRef
-    fields:[]FieldDecl
+    members:[]MemberDecl
 }
 
 struct ImportDecl {
@@ -354,14 +356,18 @@ func field_decl():FieldDecl {
     /name=ident S ":" S t=type_ref S ";"/; FieldDecl{name, t}
 }
 
+func member_decl():MemberDecl {
+    field_decl() | func_decl()
+}
+
 func struct_decl():StructDecl {
     is_ref=(/"struct"/; false | /"class"/; true);
     /end_of_keyword S name=ident S/;
     (/":" S parent=type_ref S/ | parent=NoTypeRef{});
     /"{" S/;
-    fields=[]FieldDecl{};
-    /(fields<<field_decl (S fields<<field_decl)*)? S "}"/;
-    StructDecl{name, is_ref, parent, fields}
+    members=[]MemberDecl{};
+    /(members<<member_decl (S members<<member_decl)*)? S "}"/;
+    StructDecl{name, is_ref, parent, members}
 }
 
 func test_decl():TestDecl {

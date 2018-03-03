@@ -34,12 +34,12 @@ class FunctionType(object):
 
 class Field(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string t:Type owner:Struct@[backedge]'
+    __schema__ = 'loc:int name:string t:Type@[no_init] owner:Struct@[backedge]'
 
 
 class Struct(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string is_ref:bool module:Module parent:?Struct@[backedge, no_init] fields:[]Field@[no_init] namespace:OrderedDict@[simple_init]'
+    __schema__ = 'loc:int name:string is_ref:bool module:Module parent:?Struct@[backedge, no_init] fields:[]Field@[no_init] methods:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class PoisonType(object):
@@ -75,9 +75,19 @@ class GetField(object):
     __schema__ = 'loc:int expr:Expr field:Field@[backedge]'
 
 
+class GetMethod(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int expr:Expr func:Function@[backedge]'
+
+
 class DirectCall(object):
     __metaclass__ = TreeMeta
     __schema__ = 'loc:int f:BaseFunction@[backedge] args:[]Expr'
+
+
+class DirectMethodCall(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int expr:Expr f:BaseFunction@[backedge] args:[]Expr'
 
 
 class Constructor(object):
@@ -145,7 +155,7 @@ class PoisonExpr(object):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, DirectCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, GetMethod, DirectCall, DirectMethodCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, PoisonExpr)
 
 
 class SetLocal(object):
@@ -183,7 +193,7 @@ class Local(object):
 
 class Function(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string module:Module params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
+    __schema__ = 'loc:int name:string module:Module self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
 
 
 class ExternFunction(object):

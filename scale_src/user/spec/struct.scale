@@ -9,6 +9,10 @@ struct Vec3 {
     x:f32;
     y:f32;
     z:f32;
+
+    fn dot(other:Vec3) -> f32 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
 }
 
 test "struct constructor" {
@@ -31,6 +35,12 @@ test "struct copy" {
     b.x = 4.0;
     std.assert(1.0 == a.x);
     std.assert(4.0 == b.x);
+}
+
+test "method" {
+    let a = Vec3(1.0, 2.0, 3.0);
+    let b = Vec3(11.0, 7.0, 5.0);
+    std.assert(a.dot(b) == 40.0);
 }
 
 test "compound constructor" {
