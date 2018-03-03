@@ -226,7 +226,6 @@ class GenerateExpr(object):
         deref = '->' if is_ptr else '.'
         return '%s%s%s(%s)' % (expr, deref, name, ', '.join(args)), 2, True, implemented_as_ptr(node.f.t.rt)
 
-
     @dispatch(model.TupleLiteral)
     def visitTupleLiteral(cls, node, used, gen):
         if used:
@@ -371,14 +370,20 @@ class GenerateSource(object):
 
         gen.tmp_id = 0
         gen.out.write('\n')
-        if not is_method:
+        if is_method:
+            if node.is_overridden and not node.overrides:
+                gen.out.write('virtual ')
+        else:
             gen.out.write('static ')
         gen.out.write(GenerateTypeRef.visit(node.t.rt, gen))
 
         name = node.name if is_method else gen.get_name(node)
         gen.out.write(' ').write(name).write('(')
         gen_params(node.params, gen)
-        gen.out.write(') {\n')
+        gen.out.write(') ')
+        if node.overrides:
+            gen.out.write('override ')
+        gen.out.write('{\n')
         with gen.out.block():
             # Declare locals
             params = set([p.lcl for p in node.params])

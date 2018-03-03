@@ -193,7 +193,7 @@ class Local(object):
 
 class Function(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int name:string module:Module self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
+    __schema__ = 'loc:int name:string module:Module overrides:Function@[no_init] is_overridden:bool@[no_init] self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
 
 
 class ExternFunction(object):

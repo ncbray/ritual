@@ -72,14 +72,23 @@ test "inherit" {
 
 class Child : Inbetween {
     c:i32;
+    fn sum() -> i32 {
+        self.a + self.b + self.c
+    }
 }
 
 class Inbetween: Base {
     b:i32;
+    fn sum() -> i32 {
+        self.a + self.b
+    }
 }
 
 class Base {
     a:i32;
+    fn sum() -> i32 {
+        self.a
+    }
 }
 
 fn type_merge(cond:bool) -> Base {
@@ -90,9 +99,16 @@ fn type_merge(cond:bool) -> Base {
     }
 }
 
-test "inherit merge" {
-    std.assertEqualI32(type_merge(true).a, 3);
-    std.assertEqualI32(type_merge(false).a, 2);
+test "inherit merge leaf" {
+    let v = type_merge(true);
+    std.assertEqualI32(v.a, 3);
+    std.assertEqualI32(v.sum(), 6);
+}
+
+test "inherit merge branch" {
+    let v = type_merge(false);
+    std.assertEqualI32(v.a, 2);
+    std.assertEqualI32(v.sum(), 3);
 }
 
 class Holder {

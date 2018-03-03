@@ -256,12 +256,17 @@ class ResolveSignatures(object):
             loc = m.name.loc
             name = m.name.text
 
+            f = s.namespace[name]
+
             if s.parent:
                 shadowing = struct_lookup(s.parent, name)
                 if shadowing:
-                    semantic.status.error('"%s" shadows an existing name' % name, loc, [shadowing.loc])
+                    if isinstance(f, model.Function) and isinstance(shadowing, model.Function):
+                        f.overrides = shadowing
+                        shadowing.is_overridden = True
+                    else:
+                        semantic.status.error('"%s" shadows an existing name' % name, loc, [shadowing.loc])
 
-            f = s.namespace[name]
             if isinstance(m, parser.FuncDecl):
                 cls.visit(m, f, semantic)
             elif isinstance(m, parser.FieldDecl):
@@ -686,8 +691,9 @@ class ResolveCode(object):
             used = True
             f.body, t = cls.visit(node.body, used, semantic)
 
-            # TODO: break down tuple checks.
-            check_can_hold(f.body.loc, f.t.rt, t, semantic)
+            if not isinstance(t, model.PoisonType):
+                # TODO: break down tuple checks.
+                check_can_hold(f.body.loc, f.t.rt, t, semantic)
 
         semantic.func = None
 
