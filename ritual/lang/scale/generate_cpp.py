@@ -8,10 +8,17 @@ class Generator(object):
         self.out = out
         self.names = {}
         self.tmp_id = 0
+        self.label_id = 0
+
 
     def alloc_temp(self):
         tmp = 'tmp_%d' % self.tmp_id
         self.tmp_id += 1
+        return tmp
+
+    def alloc_label(self):
+        tmp = 'label_%d' % self.label_id
+        self.label_id += 1
         return tmp
 
     def get_name(self, obj):
@@ -297,6 +304,15 @@ class GenerateExpr(object):
         gen_if(node, tmp, gen)
         return tmp, 0, False, implemented_as_ptr(node.rt)
 
+    @dispatch(model.Match)
+    def visitMatch(cls, node, used, gen):
+        tmp = None
+        if used:
+            tmp = gen.alloc_temp()
+            gen.out.write(GenerateTypeRef.visit(node.rt, gen)).write(' ').write(tmp).write(';\n')
+        gen_match(node, tmp, gen)
+        return tmp, 0, False, implemented_as_ptr(node.rt)
+
     @dispatch(model.While)
     def visitWhile(cls, node, used, gen):
         assert not used
@@ -313,9 +329,9 @@ def is_nop(node):
     return isinstance(node, model.Sequence) and not node.children
 
 
-def gen_arg(node, containing_prec, gen):
+def gen_arg(node, containing_prec, gen, always_capture=False):
     expr, prec, impure, is_ptr = GenerateExpr.visit(node, True, gen)
-    if impure:
+    if impure or always_capture:
         tmp = gen.alloc_temp()
         gen.out.write('auto %s = %s;\n' % (tmp, expr))
         return tmp, is_ptr
@@ -335,6 +351,48 @@ def gen_if(node, target, gen):
         with gen.out.block():
             gen_capture(node.f, target, gen)
     gen.out.write('}\n')
+
+
+def gen_matcher(node, expr, next, gen):
+    assert isinstance(node, model.StructMatch), node
+
+    tmp = gen.alloc_temp()
+    t_name = gen.get_name(node.t)
+    gen.out.write('auto %s = std::dynamic_pointer_cast<%s>(%s);\n' % (tmp, t_name, expr))
+    gen.out.write('if (%s == nullptr) goto ' % tmp).write(next).write(';\n')
+
+
+def gen_match(node, target, gen):
+    if not node.cases:
+        assert not target, node
+        gen_void(node.cond, gen)
+        return
+
+    cond, _ = gen_arg(node.cond, 17, gen, always_capture=True)
+    done = gen.alloc_label()
+
+    for i, case in enumerate(node.cases):
+        first = i == 0
+        last = i == len(node.cases) - 1
+        if not first:
+            gen.out.write(next).write(':\n')
+        next = gen.alloc_label()
+
+        gen.out.write('{\n')
+        with gen.out.block():
+            gen_matcher(case.matcher, cond, next, gen)
+            gen_capture(case.expr, target, gen)
+            # Jump to the exit.
+            gen.out.write('goto ').write(done).write(';\n')
+
+        gen.out.write('}\n')
+
+    # TODO better validation.
+    gen.out.write(next).write(':\n')
+    gen.out.write('abort();\n')
+
+    # Exit
+    gen.out.write(done).write(':\n')
 
 
 def gen_capture(node, target, gen):
@@ -369,6 +427,7 @@ class GenerateSource(object):
         is_method = node.self != None
 
         gen.tmp_id = 0
+        gen.label_id = 0
         gen.out.write('\n')
         if is_method:
             if node.is_overridden and not node.overrides:

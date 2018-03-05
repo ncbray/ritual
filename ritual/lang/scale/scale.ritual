@@ -75,6 +75,24 @@ struct While {
     body:Expr
 }
 
+struct StructMatch {
+    t:TypeRef
+}
+
+union Matcher = StructMatch;
+
+struct Case {
+    loc:location
+    matcher:Matcher
+    expr:Expr
+}
+
+struct Match {
+    loc:location
+    cond:Expr
+    cases:[]Case
+}
+
 struct PrefixOp {
     loc:location
     op:string
@@ -88,7 +106,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | If | While | PrefixOp | BinaryOp;
+union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | If | While | Match | PrefixOp | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -206,6 +224,28 @@ func string_literal():StringLiteral {
     StringLiteral{loc(), string_value()}
 }
 
+func matcher():Matcher {
+    t=type_ref(); StructMatch{t}
+}
+
+func match_case():Case {
+    /l=loc "case" end_of_keyword S m=matcher S ":" S e=expr_or_nothing/; Case{l, m, e}
+}
+
+func match_expr():Match {
+    /l=loc "match" end_of_keyword S cond=expr S "{"/;
+    cases = []Case{};
+    /(S cases<<match_case)* S "}"/; Match{l, cond, cases}
+}
+
+func if_expr():If {
+    /l=loc "if" end_of_keyword S cond=expr S "{" S t=expr_or_nothing S "}"/; (/S "else" S "{" S  f=expr_or_nothing S "}"/| f=Sequence{[]Expr{}}); If{l, cond, t, f}
+}
+
+func while_expr():While {
+    /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr_or_nothing S "}"/; While{l, cond, body}
+}
+
 func expr_atom():Expr {
     (/l=loc "(" S/; 
         (e=expr();
@@ -225,8 +265,9 @@ func expr_atom():Expr {
         | /"false" end_of_keyword/; BooleanLiteral{l, false}
         )
     | /l=loc "let" end_of_keyword S/; Let{l, expr_postfix()}
-    | /l=loc "if" end_of_keyword S cond=expr S "{" S t=expr_or_nothing S "}"/; (/S "else" S "{" S  f=expr_or_nothing S "}"/| f=Sequence{[]Expr{}}); If{l, cond, t, f}
-    | /l=loc "while" end_of_keyword S cond=expr S "{" S body=expr_or_nothing S "}"/; While{l, cond, body}
+    | if_expr()
+    | while_expr()
+    | match_expr()
     | GetName{loc(), ident()}
     )
 }

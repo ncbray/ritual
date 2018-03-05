@@ -111,6 +111,22 @@ test "inherit merge branch" {
     std.assertEqualI32(v.sum(), 3);
 }
 
+fn type_match(v:Base) -> i32 {
+    match v {
+        case Child: 3
+        case Inbetween: 2
+        case Base: 1
+    }
+}
+
+test "simple inherit switch leaf" {
+    std.assertEqualI32(type_match(type_merge(true)), 3);
+}
+
+test "simple inherit switch branch" {
+    std.assertEqualI32(type_match(type_merge(false)), 2);
+}
+
 class Holder {
     value:i32;
 }

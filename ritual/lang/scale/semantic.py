@@ -367,7 +367,7 @@ def flatten_inheritance(s):
     else:
         return [s]
 
-def unify_types(a, b):
+def unify_type_pair(a, b):
     if a is b:
         return a
     if isinstance(a, model.Struct) and isinstance(b, model.Struct):
@@ -380,6 +380,26 @@ def unify_types(a, b):
             prev = ap
         return prev
     return None
+
+
+def unify_types(loc, used, types, semantic):
+    if not used or not types:
+        return VOID_TYPE
+
+    t = types[0]
+    if t is POISON_TYPE:
+        return POISON_TYPE
+
+    for other in types[1:]:
+        if other is POISON_TYPE:
+            return POISON_TYPE
+
+        next = unify_type_pair(t, other)
+        if next is None:
+            semantic.status.error('cannot unify types %s and %s' % (PrintableTypeName.visit(t), PrintableTypeName.visit(other)), loc)
+            return POISON_TYPE
+        t = next
+    return t
 
 
 def check_can_hold(loc, a, b, semantic):
@@ -459,6 +479,16 @@ class ResolveAssignmentTarget(object):
             args.append(cls.visit(arg, arg_t, is_let, semantic))
 
         return model.DestructureTuple(loc, args)
+
+
+class ResolveMatcher(object):
+    __metaclass__ = TypeDispatcher
+
+    @dispatch(parser.StructMatch)
+    def visitStructMatch(cls, node, t, semantic):
+        mt = ResolveType.visit(node.t, semantic)
+        check_can_hold(node.t.name.loc, t, mt, semantic)
+        return model.StructMatch(mt)
 
 
 class ResolveCode(object):
@@ -658,17 +688,8 @@ class ResolveCode(object):
         te, tt = cls.visit(node.t, used, semantic)
         fe, ft = cls.visit(node.f, used, semantic)
 
-        if not used:
-            t = VOID_TYPE
-        elif tt == POISON_TYPE or ft == POISON_TYPE:
-            t = POISON_TYPE
-        else:
-            t = unify_types(tt, ft)
-            if t is None:
-                semantic.status.error('cannot unify types %s and %s' % (PrintableTypeName.visit(tt), PrintableTypeName.visit(ft)), loc)
-                t = POISON_TYPE
-
-        return model.If(loc, cond, te, fe, t), t
+        rt = unify_types(loc, used, [tt, ft], semantic)
+        return model.If(loc, cond, te, fe, rt), rt
 
     @dispatch(parser.While)
     def visitWhile(cls, node, used, semantic):
@@ -676,6 +697,19 @@ class ResolveCode(object):
         check_can_hold(node.cond.loc, semantic.builtins['bool'], ct, semantic)
         body, _ = cls.visit(node.body, False, semantic)
         return model.While(node.loc, cond, body), VOID_TYPE
+
+    @dispatch(parser.Match)
+    def visitMatch(cls, node, used, semantic):
+        cond, ct = cls.visit(node.cond, True, semantic)
+        cases = []
+        types = []
+        for case in node.cases:
+            m = ResolveMatcher.visit(case.matcher, ct, semantic)
+            e, et = cls.visit(case.expr, used, semantic)
+            cases.append(model.Case(case.loc, m, e))
+            types.append(et)
+        rt = unify_types(node.loc, used, types, semantic)
+        return model.Match(node.loc, cond, cases, rt), rt
 
     @dispatch(parser.FuncDecl)
     def visitFuncDecl(cls, node, f, semantic, struct=None):

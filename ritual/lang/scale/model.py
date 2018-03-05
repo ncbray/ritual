@@ -150,12 +150,30 @@ class While(object):
     __schema__ = 'loc:int cond:Expr body:Expr'
 
 
+class StructMatch(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 't:Struct@[backedge]'
+
+
+Matcher = (StructMatch,)
+
+
+class Case(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int matcher:Matcher expr:Expr'
+
+
+class Match(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int cond:Expr cases:[]Case rt:Type'
+
+
 class PoisonExpr(object):
     __metaclass__ = TreeMeta
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, GetMethod, DirectCall, DirectMethodCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, GetMethod, DirectCall, DirectMethodCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, Match, PoisonExpr)
 
 
 class SetLocal(object):
