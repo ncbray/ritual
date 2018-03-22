@@ -462,23 +462,24 @@ class ResolveAssignmentTarget(object):
     @dispatch(parser.TupleLiteral)
     def visitTupleLiteral(cls, node, value_type, is_let, semantic):
         loc = node.loc
-        ok = False
-        if isinstance(value_type, model.PoisonType):
-            pass
-        elif not isinstance(value_type, model.TupleType):
-            semantic.status.error('expected tuple, but got %s' % (PrintableTypeName.visit(value_type)), loc)
-        elif len(node.args) != len(value_type.children):
-            semantic.status.error('expected tuple of length %d, but got %d' % (len(node.args), len(value_type.children)), loc)
-        else:
-            ok = True
 
-        args = []
-        for i in range(len(node.args)):
-            arg = node.args[i]
-            arg_t = value_type.children[i] if ok else POISON_TYPE
-            args.append(cls.visit(arg, arg_t, is_let, semantic))
+        if isinstance(value_type, model.TupleType):
+            if len(node.args) == len(value_type.children):
+                args = []
+                for i in range(len(node.args)):
+                    arg = node.args[i]
+                    arg_t = value_type.children[i]
+                    args.append(cls.visit(arg, arg_t, is_let, semantic))
+                return model.DestructureTuple(loc, args)
+            else:
+                semantic.status.error('expected tuple of length %d, but got %d' % (len(node.args), len(value_type.children)), loc)
 
-        return model.DestructureTuple(loc, args)
+        # Can't validate the destructuring, so validate the children as much as we can and then fail.
+        for arg in node.args:
+            cls.visit(arg, POISON_TYPE, is_let, semantic)
+        if not isinstance(value_type, model.PoisonType):
+            semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc)
+        return POISON_TARGET
 
 
 class ResolveMatcher(object):

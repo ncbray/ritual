@@ -15,6 +15,16 @@ struct Vec3 {
     }
 }
 
+struct SimpleInline {
+    n0:i32;
+    n1:i32;
+}
+
+class SimpleIndirect {
+    n0:i32;
+    n1:i32;
+}
+
 test "struct constructor" {
     let v = Vec3(1.0, 2.0, 3.0);
     std.assert(1.0 == v.x);
@@ -149,4 +159,30 @@ test "tuple destructure swap" {
     (b, a) = (a, b);
     std.assertEqualI32(a, 11);
     std.assertEqualI32(b, 7);
+}
+
+test "tuple destructure field targets inline" {
+    let s = SimpleInline(0, 0);
+    let a = 7;
+    let b = 11;
+    (s.n0, s.n1) = (a, b);
+    std.assertEqualI32(s.n0, 7);
+    std.assertEqualI32(s.n1, 11);
+
+    (s.n1, s.n0) = (s.n0, s.n1);
+    std.assertEqualI32(s.n0, 11);
+    std.assertEqualI32(s.n1, 7);
+}
+
+test "tuple destructure field targets indirect" {
+    let s = SimpleIndirect(0, 0);
+    let a = 7;
+    let b = 11;
+    (s.n0, s.n1) = (a, b);
+    std.assertEqualI32(s.n0, 7);
+    std.assertEqualI32(s.n1, 11);
+
+    (s.n1, s.n0) = (s.n0, s.n1);
+    std.assertEqualI32(s.n0, 11);
+    std.assertEqualI32(s.n1, 7);
 }
