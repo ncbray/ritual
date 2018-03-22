@@ -49,9 +49,9 @@ class SemanticPass(object):
         for i, ns in enumerate(self._namespaces):
             if name in ns:
                 if i == 0:
-                    semantic.status.error('tried to redefine "%s"' % name, loc)
+                    self.status.error('tried to redefine "%s"' % name, loc)
                 else:
-                    semantic.status.error('"%s" shadows an existing name' % name, loc)
+                    self.status.error('"%s" shadows an existing name' % name, loc)
                 # TODO Poison?
                 return False
         self._namespaces[0][name] = obj
