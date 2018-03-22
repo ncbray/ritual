@@ -422,19 +422,19 @@ class ResolveAssignmentTarget(object):
         if is_let:
             lcl = semantic.define_lcl(loc, name, value_type)
             if not lcl:
-                return POISON_TARGET
-            return model.SetLocal(loc, lcl)
+                return POISON_TARGET, True
+            return model.SetLocal(loc, lcl), True
         else:
             obj = semantic.lookup(name)
             if obj is None:
                 semantic.status.error('cannot resolve "%s"' % name, loc)
-                return POISON_TARGET
+                return POISON_TARGET, False
             if not isinstance(obj, model.Local):
                 # TODO metter naming?
                 semantic.status.error('cannot assign to %s' % type(obj).__name__, loc)
-                return POISON_TARGET
+                return POISON_TARGET, False
             check_can_hold(loc, obj.t, value_type, semantic)
-            return model.SetLocal(loc, obj)
+            return model.SetLocal(loc, obj), False
 
     @dispatch(parser.GetAttr)
     def visitGetAttr(cls, node, value_type, is_let, semantic):
@@ -442,22 +442,25 @@ class ResolveAssignmentTarget(object):
         name = node.name.text
         expr, t = ResolveCode.visit(node.expr, True, semantic)
         if isinstance(t, model.PoisonType):
-            return POISON_TARGET
+            return POISON_TARGET, False
         elif isinstance(t, model.Struct):
             f = struct_lookup(t, name)
             if f is None:
                 semantic.status.error('cannot set attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
-                return POISON_TARGET
-            return model.SetField(loc, expr, f)
+                return POISON_TARGET, False
+            return model.SetField(loc, expr, f), False
         else:
             semantic.status.error('cannot set attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
-            return POISON_TARGET
+            return POISON_TARGET, False
 
     @dispatch(parser.Let)
     def visitLet(cls, node, value_type, is_let, semantic):
         if is_let:
-            semantic.status.error('redundant let', node.loc)
-        return cls.visit(node.expr, value_type, True, semantic)
+            semantic.status.error('redundant "let"', node.loc)
+        tgt, defines = cls.visit(node.expr, value_type, True, semantic)
+        if not defines:
+            semantic.status.error('"let" does not define a new variable', node.loc)
+        return tgt, defines
 
     @dispatch(parser.TupleLiteral)
     def visitTupleLiteral(cls, node, value_type, is_let, semantic):
@@ -466,20 +469,25 @@ class ResolveAssignmentTarget(object):
         if isinstance(value_type, model.TupleType):
             if len(node.args) == len(value_type.children):
                 args = []
+                defines = False
                 for i in range(len(node.args)):
                     arg = node.args[i]
                     arg_t = value_type.children[i]
-                    args.append(cls.visit(arg, arg_t, is_let, semantic))
-                return model.DestructureTuple(loc, args)
+                    arg, arg_defines = cls.visit(arg, arg_t, is_let, semantic)
+                    defines |= arg_defines
+                    args.append(arg)
+                return model.DestructureTuple(loc, args), defines
             else:
                 semantic.status.error('expected tuple of length %d, but got %d' % (len(node.args), len(value_type.children)), loc)
 
         # Can't validate the destructuring, so validate the children as much as we can and then fail.
+        defines = False
         for arg in node.args:
-            cls.visit(arg, POISON_TYPE, is_let, semantic)
+            _, arg_defines = cls.visit(arg, POISON_TYPE, is_let, semantic)
+            defines |= arg_defines
         if not isinstance(value_type, model.PoisonType):
             semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc)
-        return POISON_TARGET
+        return POISON_TARGET, defines
 
 
 class ResolveMatcher(object):
@@ -642,7 +650,7 @@ class ResolveCode(object):
     @dispatch(parser.Assign)
     def visitAssign(cls, node, used, semantic):
         value, vt = cls.visit(node.value, True, semantic)
-        target = ResolveAssignmentTarget.visit(node.target, vt, False, semantic)
+        target, _ = ResolveAssignmentTarget.visit(node.target, vt, False, semantic)
         return model.Assign(node.loc, target, value), VOID_TYPE
 
     @dispatch(parser.Sequence)
