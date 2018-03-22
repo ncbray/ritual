@@ -142,3 +142,11 @@ test "class alias" {
     h1.value = 11;
     std.assertEqualI32(h2.value, 11);
 }
+
+test "tuple destructure swap" {
+    let a = 7;
+    let b = 11;
+    (b, a) = (a, b);
+    std.assertEqualI32(a, 11);
+    std.assertEqualI32(b, 7);
+}
