@@ -130,6 +130,22 @@ class GenerateTarget(object):
         for i, tgt in enumerate(node.args):
             cls.visit(tgt, 'std::get<%d>(%s)' % (i, value), gen)
 
+    @dispatch(model.DestructureStruct)
+    def visitDestructureStruct(cls, node, value, gen):
+        t = node.t
+        all_fields = t.fields
+        current = t.parent
+        while current:
+            all_fields = current.fields + all_fields
+            current = current.parent
+
+        deref = '->' if t.is_ref else '.'
+
+        assert len(all_fields) == len(node.args)
+        for i, tgt in enumerate(node.args):
+            f = all_fields[i]
+            cls.visit(tgt, '%s%s%s' % (value, deref, f.name), gen)
+
 
 escapes = {
     '\\': '\\\\',

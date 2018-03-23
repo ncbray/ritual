@@ -193,7 +193,7 @@ class DestructureTuple(object):
 
 class DestructureStruct(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int args:[]Target'
+    __schema__ = 'loc:int t:Type args:[]Target'
 
 
 class PoisonTarget(object):

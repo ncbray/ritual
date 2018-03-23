@@ -193,3 +193,11 @@ test "tuple destructure field order matters" {
     (s0, s0.n0) = (s1, 13);
     std.assertEqualI32(s1.n0, 13);
 }
+
+test "struct destructure" {
+    let v = Vec3(1.0, 2.0, 3.0);
+    let (a, b, c) = v;
+    std.assert(1.0 == a);
+    std.assert(2.0 == b);
+    std.assert(3.0 == c);
+}

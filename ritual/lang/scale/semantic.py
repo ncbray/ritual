@@ -496,7 +496,7 @@ class ResolveAssignmentTarget(object):
                     arg, arg_defines = cls.visit(arg, arg_t, is_let, semantic)
                     defines |= arg_defines
                     args.append(arg)
-                return model.DestructureStruct(loc, args), defines
+                return model.DestructureStruct(loc, value_type, args), defines
             else:
                 semantic.status.error('expected structure with %d fields, but %s has %d fields' % (len(node.args), PrintableTypeName.visit(value_type), len(all_fields)), loc)
         elif not isinstance(value_type, model.PoisonType):
