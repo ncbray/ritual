@@ -191,12 +191,17 @@ class DestructureTuple(object):
     __schema__ = 'loc:int args:[]Target'
 
 
+class DestructureStruct(object):
+    __metaclass__ = TreeMeta
+    __schema__ = 'loc:int args:[]Target'
+
+
 class PoisonTarget(object):
     __metaclass__ = TreeMeta
     __schema__ = ''
 
 
-Target = (SetLocal, SetField, DestructureTuple, PoisonTarget)
+Target = (SetLocal, SetField, DestructureTuple, DestructureStruct, PoisonTarget)
 
 
 class Param(object):

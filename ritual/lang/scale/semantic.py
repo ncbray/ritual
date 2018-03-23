@@ -479,14 +479,34 @@ class ResolveAssignmentTarget(object):
                 return model.DestructureTuple(loc, args), defines
             else:
                 semantic.status.error('expected tuple of length %d, but got %d' % (len(node.args), len(value_type.children)), loc)
+        elif isinstance(value_type, model.Struct):
+            # Flatten fields.
+            all_fields = value_type.fields
+            parent = value_type.parent
+            while parent:
+                all_fields = parent.fields + all_fields
+                parent = parent.parent
+
+            if len(node.args) == len(all_fields):
+                args = []
+                defines = False
+                for i in range(len(node.args)):
+                    arg = node.args[i]
+                    arg_t = all_fields[i].t
+                    arg, arg_defines = cls.visit(arg, arg_t, is_let, semantic)
+                    defines |= arg_defines
+                    args.append(arg)
+                return model.DestructureStruct(loc, args), defines
+            else:
+                semantic.status.error('expected structure with %d fields, but %s has %d fields' % (len(node.args), PrintableTypeName.visit(value_type), len(all_fields)), loc)
+        elif not isinstance(value_type, model.PoisonType):
+            semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc) 
 
         # Can't validate the destructuring, so validate the children as much as we can and then fail.
         defines = False
         for arg in node.args:
             _, arg_defines = cls.visit(arg, POISON_TYPE, is_let, semantic)
             defines |= arg_defines
-        if not isinstance(value_type, model.PoisonType):
-            semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc)
         return POISON_TARGET, defines
 
 

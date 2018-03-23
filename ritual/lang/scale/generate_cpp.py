@@ -115,20 +115,20 @@ class GenerateTarget(object):
     __metaclass__ = TypeDispatcher
 
     @dispatch(model.SetLocal)
-    def visitSetLocal(cls, node, gen):
-        return node.lcl.name
+    def visitSetLocal(cls, node, value, gen):
+        gen.out.write(node.lcl.name + ' = ' + value + ';\n')
 
     @dispatch(model.SetField)
-    def visitSetField(cls, node, gen):
+    def visitSetField(cls, node, value, gen):
         prec = 2
         expr, is_ptr = gen_arg(node.expr, 2, gen)
         deref = '->' if is_ptr else '.'
-        return expr + deref + node.field.name
+        gen.out.write(expr + deref + node.field.name + ' = ' + value + ';\n')
 
     @dispatch(model.DestructureTuple)
-    def visitDestructureTuple(cls, node, gen):
-        tgts = [cls.visit(tgt, gen) for tgt in node.args]
-        return 'std::tie(%s)' % ', '.join(tgts)
+    def visitDestructureTuple(cls, node, value, gen):
+        for i, tgt in enumerate(node.args):
+            cls.visit(tgt, 'std::get<%d>(%s)' % (i, value), gen)
 
 
 escapes = {
@@ -267,9 +267,8 @@ class GenerateExpr(object):
     @dispatch(model.Assign)
     def visitAssign(cls, node, used, gen):
         assert not used
-        target = GenerateTarget.visit(node.target, gen)
-        value, _, impure, _ = cls.visit(node.value, True, gen)
-        gen.out.write(target + ' = ' + value + ';\n')
+        value, _ = gen_arg(node.value, 17, gen, always_capture=True)
+        GenerateTarget.visit(node.target, value, gen)
         return None, 0, False, False
 
     @dispatch(model.PrefixOp)
