@@ -315,9 +315,9 @@ class GenerateExpr(object):
         tmp = None
         if used:
             tmp = gen.alloc_temp()
-            gen.out.write(GenerateTypeRef.visit(node.rt, gen)).write(' ').write(tmp).write(';\n')
+            gen.out.write(GenerateTypeRef.visit(node.t, gen)).write(' ').write(tmp).write(';\n')
         gen_if(node, tmp, gen)
-        return tmp, 0, False, implemented_as_ptr(node.rt)
+        return tmp, 0, False, implemented_as_ptr(node.t)
 
     @dispatch(model.Match)
     def visitMatch(cls, node, used, gen):
@@ -360,11 +360,11 @@ def gen_if(node, target, gen):
     cond, _, _, _ = GenerateExpr.visit(node.cond, True, gen)
     gen.out.write('if (%s) {\n' % cond)
     with gen.out.block():
-        gen_capture(node.t, target, gen)
-    if not is_nop(node.f):
+        gen_capture(node.tbody, target, gen)
+    if not is_nop(node.fbody):
         gen.out.write('} else {\n')
         with gen.out.block():
-            gen_capture(node.f, target, gen)
+            gen_capture(node.fbody, target, gen)
     gen.out.write('}\n')
 
 

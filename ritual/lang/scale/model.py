@@ -82,12 +82,12 @@ class GetMethod(object):
 
 class DirectCall(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int f:BaseFunction@[backedge] args:[]Expr'
+    __schema__ = 'loc:int f:BaseFunction@[backedge] args:[]Expr t:Type@[backedge]'
 
 
 class DirectMethodCall(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int expr:Expr f:BaseFunction@[backedge] args:[]Expr'
+    __schema__ = 'loc:int expr:Expr f:BaseFunction@[backedge] args:[]Expr t:Type@[backedge]'
 
 
 class Constructor(object):
@@ -97,7 +97,7 @@ class Constructor(object):
 
 class BooleanLiteral(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int value:bool'
+    __schema__ = 'loc:int value:bool t:Type@[backedge]'
 
 
 class TupleLiteral(object):
@@ -107,17 +107,17 @@ class TupleLiteral(object):
 
 class FloatLiteral(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int text:string value:float'
+    __schema__ = 'loc:int text:string value:float t:Type@[backedge]'
 
 
 class IntLiteral(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int value:int'
+    __schema__ = 'loc:int value:int t:Type@[backedge]'
 
 
 class StringLiteral(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int value:basestring'
+    __schema__ = 'loc:int value:basestring t:Type@[backedge]'
 
 
 class Assign(object):
@@ -127,22 +127,22 @@ class Assign(object):
 
 class Sequence(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int children:[]Expr'
+    __schema__ = 'loc:int children:[]Expr t:Type@[backedge]'
 
 
 class PrefixOp(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int op:string expr:Expr'
+    __schema__ = 'loc:int op:string expr:Expr t:Type@[backedge]'
 
 
 class BinaryOp(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int left:Expr op:string right:Expr t:Type'
+    __schema__ = 'loc:int left:Expr op:string right:Expr t:Type@[backedge]'
 
 
 class If(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int cond:Expr t:Expr f:Expr rt:Type'
+    __schema__ = 'loc:int cond:Expr tbody:Expr fbody:Expr t:Type@[backedge]'
 
 
 class While(object):

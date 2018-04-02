@@ -535,7 +535,8 @@ class ResolveCode(object):
 
     @dispatch(parser.BooleanLiteral)
     def visitBooleanLiteral(cls, node, used, semantic):
-        return model.BooleanLiteral(node.loc, node.value), semantic.builtins['bool']
+        t = semantic.builtins['bool']
+        return model.BooleanLiteral(node.loc, node.value, t), t
 
     @dispatch(parser.IntLiteral)
     def visitIntLiteral(cls, node, used, semantic):
@@ -551,7 +552,7 @@ class ResolveCode(object):
             if value > 2**bits:
                 semantic.status.error('literal of type %s is out of range' % PrintableTypeName.visit(t), loc)
                 return POISON_EXPR, t
-            return model.IntLiteral(loc, value), t
+            return model.IntLiteral(loc, value, t), t
 
     @dispatch(parser.FloatLiteral)
     def visitFloatLiteral(cls, node, used, semantic):
@@ -562,11 +563,12 @@ class ResolveCode(object):
         text = node.text
         value = float(node.text)
         # TODO flexible types?
-        return model.FloatLiteral(loc, text, value), t
+        return model.FloatLiteral(loc, text, value, t), t
 
     @dispatch(parser.StringLiteral)
     def visitStringLiteral(cls, node, used, semantic):
-        return model.StringLiteral(node.loc, node.value), semantic.builtins['string']
+        t = semantic.builtins['string']
+        return model.StringLiteral(node.loc, node.value, t), t
 
     @dispatch(parser.GetName)
     def visitGetName(cls, node, used, semantic):
@@ -635,9 +637,9 @@ class ResolveCode(object):
                     check_can_hold(ae.loc, pt, at, semantic)
 
             if isinstance(expr, model.GetFunction):
-                return model.DirectCall(loc, expr.f, arg_exprs), et.rt
+                return model.DirectCall(loc, expr.f, arg_exprs, et.rt), et.rt
             elif isinstance(expr, model.GetMethod):
-                return model.DirectMethodCall(loc, expr.expr, expr.func, arg_exprs), et.rt
+                return model.DirectMethodCall(loc, expr.expr, expr.func, arg_exprs, et.rt), et.rt
             else:
                 assert False, expr
         elif isinstance(et, model.Struct):
@@ -686,7 +688,7 @@ class ResolveCode(object):
             t = VOID_TYPE
         # HACK
         loc = children[-1].loc if children and hasattr(children[-1], 'loc') else -1
-        return model.Sequence(loc, children), t
+        return model.Sequence(loc, children, t), t
 
     @dispatch(parser.PrefixOp)
     def visitPrefixOp(cls, node, used, semantic):
@@ -694,7 +696,7 @@ class ResolveCode(object):
         expr, t = cls.visit(node.expr, used, semantic)
         if node.op == '!':
             t = semantic.builtins['bool']
-        return model.PrefixOp(loc, node.op, expr), t
+        return model.PrefixOp(loc, node.op, expr, t), t
 
     @dispatch(parser.BinaryOp)
     def visitBinaryOp(cls, node, used, semantic):
@@ -707,7 +709,7 @@ class ResolveCode(object):
             t = semantic.builtins['bool']
         else:
             t = lt
-        return model.BinaryOp(loc, l, node.op, r, lt), t
+        return model.BinaryOp(loc, l, node.op, r, t), t
 
     @dispatch(parser.If)
     def visitIf(cls, node, used, semantic):
