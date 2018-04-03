@@ -212,19 +212,25 @@ class GenerateExpr(object):
 
     @dispatch(model.BooleanLiteral)
     def visitBooleanLiteral(cls, node, used, gen):
-        return 'true' if node.value else 'false', 0, False, False
+        literal = 'true' if node.value else 'false'
+        return literal, 0, False, False
 
     @dispatch(model.IntLiteral)
     def visitIntLiteral(cls, node, used, gen):
-        return repr(node.value), 0, False, False
+        literal = repr(node.value)
+        return literal, 0, False, False
 
     @dispatch(model.FloatLiteral)
     def visitFloatLiteral(cls, node, used, gen):
-        return node.text, 0, False, False
+        literal = node.text
+        if node.t.width == 32:
+            literal += 'f'
+        return literal, 0, False, False
 
     @dispatch(model.StringLiteral)
     def visitStringLiteral(cls, node, used, gen):
-        return string_literal(node.value), 0, False, False
+        literal = string_literal(node.value)
+        return literal, 0, False, False
 
     @dispatch(model.Constructor)
     def visitConstructor(cls, node, used, gen):
