@@ -52,7 +52,7 @@ Type = (IntrinsicType, IntegerType, FloatType, ModuleType, TupleType, FunctionTy
 
 class GetLocal(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int lcl:Local@[backedge]'
+    __schema__ = 'loc:int lcl:Local@[backedge] t:Type@[backedge]'
 
 
 class GetType(object):
@@ -72,7 +72,7 @@ class GetModule(object):
 
 class GetField(object):
     __metaclass__ = TreeMeta
-    __schema__ = 'loc:int expr:Expr field:Field@[backedge]'
+    __schema__ = 'loc:int expr:Expr field:Field@[backedge] t:Type@[backedge]'
 
 
 class GetMethod(object):

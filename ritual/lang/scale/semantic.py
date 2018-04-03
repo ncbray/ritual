@@ -327,7 +327,7 @@ class PrintableTypeName(object):
 
 def wrap_obj(loc, obj):
     if isinstance(obj, model.Local):
-        return model.GetLocal(loc, obj), obj.t
+        return model.GetLocal(loc, obj, obj.t), obj.t
     elif isinstance(obj, model.Type):
         return model.GetType(loc, obj), obj
     elif isinstance(obj, model.Function):
@@ -602,7 +602,7 @@ class ResolveCode(object):
                 semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
                 return POISON_EXPR, POISON_TYPE
             if isinstance(f, model.Field):
-                return model.GetField(loc, expr, f), f.t
+                return model.GetField(loc, expr, f, f.t), f.t
             elif isinstance(f, model.Function):
                 return model.GetMethod(loc, expr, f), f.t
             else:

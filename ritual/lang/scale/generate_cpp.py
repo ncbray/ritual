@@ -353,8 +353,10 @@ def is_nop(node):
 def gen_arg(node, containing_prec, gen, always_capture=False):
     expr, prec, impure, is_ptr = GenerateExpr.visit(node, True, gen)
     if impure or always_capture:
+        # Declare the tmp var.
+        t = GenerateTypeRef.visit(node.t, gen)
         tmp = gen.alloc_temp()
-        gen.out.write('auto %s = %s;\n' % (tmp, expr))
+        gen.out.write('%s %s = %s;\n' % (t, tmp, expr))
         return tmp, is_ptr
     else:
         if containing_prec < prec:
@@ -377,9 +379,10 @@ def gen_if(node, target, gen):
 def gen_matcher(node, expr, next, gen):
     assert isinstance(node, model.StructMatch), node
 
+    t = GenerateTypeRef.visit(node.t, gen)
     tmp = gen.alloc_temp()
     t_name = gen.get_name(node.t)
-    gen.out.write('auto %s = std::dynamic_pointer_cast<%s>(%s);\n' % (tmp, t_name, expr))
+    gen.out.write('%s %s = std::dynamic_pointer_cast<%s>(%s);\n' % (t, tmp, t_name, expr))
     gen.out.write('if (%s == nullptr) goto ' % tmp).write(next).write(';\n')
 
 
