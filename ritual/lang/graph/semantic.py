@@ -1,9 +1,11 @@
+import io
+
 from ritual.base import TypeDispatcher, dispatch
-import cStringIO
-import generate_python
 import ritual.interpreter.location
-import model
-import parser
+
+from . import generate_python
+from . import model
+from . import parser
 
 
 class SemanticPass(object):
@@ -15,8 +17,7 @@ class SemanticPass(object):
         self.globals.define(tok, value, self.status)
 
 
-class IndexGlobals(object):
-    __metaclass__ = TypeDispatcher
+class IndexGlobals(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.StructDecl)
     def visitStructDecl(cls, node, semantic):
@@ -34,8 +35,7 @@ class IndexGlobals(object):
             cls.visit(decl, semantic)
 
 
-class ResolveTypes(object):
-    __metaclass__ = TypeDispatcher
+class ResolveTypes(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.TypeRef)
     def visitTypeRef(cls, node, semantic):
@@ -130,10 +130,10 @@ def process_file(name, src, f):
     prog = ResolveTypes.visit(f, semantic)
     semantic.status.halt_if_errors()
 
-    out = cStringIO.StringIO()
+    out = io.StringIO()
     generate_python.generate(prog, out)
     return out.getvalue()
 
 def compile_source(name, src, out_dict):
     code = compile(src, name, 'exec')
-    exec code in out_dict
+    exec(code, out_dict)

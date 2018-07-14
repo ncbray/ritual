@@ -6,7 +6,7 @@ def setup():
     ritual.lang.base.generate_parser(src_file, True, globals())
 
     def int_to_rune(i):
-        return unichr(i)
+        return chr(i)
 
     def runes_to_string(runes):
         return ''.join(runes)

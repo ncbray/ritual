@@ -1,36 +1,30 @@
 from ritual.base import TreeMeta
 
 
-class ScalarPort(object):
-    __metaclass__ = TreeMeta
+class ScalarPort(object, metaclass=TreeMeta):
     __schema__ = 'names:[]string t:Struct@[backedge] edge:Edge@[backedge] src:bool owner:bool other_side:Port@[no_init, backedge]'
 
 
-class IndexedPort(object):
-    __metaclass__ = TreeMeta
+class IndexedPort(object, metaclass=TreeMeta):
     __schema__ = 'name:string t:Struct@[backedge] edge:Edge@[backedge] src:bool owner:bool other_side:Port@[no_init, backedge]'
 
 
-class BagPort(object):
-    __metaclass__ = TreeMeta
+class BagPort(object, metaclass=TreeMeta):
     __schema__ = 'name:string t:Struct@[backedge] edge:Edge@[backedge] src:bool other_side:Port@[no_init, backedge]'
 
 
 Port = (ScalarPort, IndexedPort, BagPort)
 
 
-class Struct(object):
-    __metaclass__ = TreeMeta
+class Struct(object, metaclass=TreeMeta):
     __schema__ = 'name:string ports:[]Port@[no_init] ns:StrictNamespace'
 
 
-class Edge(object):
-    __metaclass__ = TreeMeta
+class Edge(object, metaclass=TreeMeta):
     __schema__ = 'name:string src:Port@[no_init, backedge] dst:Port@[no_init, backedge] src_owns:bool@[no_init]'
 
 
-class Program(object):
-    __metaclass__ = TreeMeta
+class Program(object, metaclass=TreeMeta):
     __schema__ = 'structs:[]Struct edges:[]Edge'
 
 

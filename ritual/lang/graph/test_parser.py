@@ -1,8 +1,9 @@
 import unittest
 
 from ritual.interpreter.testutil import ParserTestCase
-import parser
-import semantic
+
+from . import parser
+from . import semantic
 
 
 class TestParser(ParserTestCase):
@@ -32,6 +33,5 @@ edge Def {
         name = 'test'
         result = self.p_ok('file', src)
         py_src = semantic.process_file(name, src, result)
-        #print py_src
         out = {}
         semantic.compile_source(name, py_src, out)

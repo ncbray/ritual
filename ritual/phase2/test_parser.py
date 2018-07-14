@@ -1,7 +1,8 @@
 import unittest
 
 from ritual.interpreter.testutil import ParserTestCase
-import parser
+
+from . import parser
 
 
 class TestParser(ParserTestCase):

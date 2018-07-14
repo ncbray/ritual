@@ -1,5 +1,5 @@
 from ritual.base import TypeDispatcher, dispatch
-import model
+from . import model
 
 
 MAX = 0xffffff
@@ -92,7 +92,7 @@ def canonical_to_model(ranges):
     if ranges and ranges[-1][1] == MAX:
         ranges = invert_ranges(ranges)
         invert = True
-    return [model.Range(unichr(r[0]), unichr(r[1])) for r in ranges], invert
+    return [model.Range(chr(r[0]), chr(r[1])) for r in ranges], invert
 
 
 class OptimizationPass(object):
@@ -128,8 +128,7 @@ def merge_sequence(cls, s, opt):
     return accum, m
 
 
-class GetPossiblePrefix(object):
-    __metaclass__ = TypeDispatcher
+class GetPossiblePrefix(object, metaclass=TypeDispatcher):
 
     @classmethod
     def cachedVisit(cls, node, opt):
@@ -205,8 +204,7 @@ class GetPossiblePrefix(object):
         return accum, m
 
 
-class DoOpt(object):
-    __metaclass__ = TypeDispatcher
+class DoOpt(object, metaclass=TypeDispatcher):
 
     @dispatch(model.Character)
     def visitCharacter(cls, node, opt):

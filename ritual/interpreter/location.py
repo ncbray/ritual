@@ -1,8 +1,7 @@
 from ritual import base
 
 
-class LocationInfo(object):
-    __metaclass__ = base.TreeMeta
+class LocationInfo(object, metaclass=base.TreeMeta):
     __schema__ = 'filename:string line:int column:int character:string text:string arrow:string'
 
 
@@ -57,14 +56,14 @@ class CompileStatus(object):
 
     def error(self, msg, loc=None, trace=None):
         if loc is None:
-            print 'error: %s' % msg
+            print('error: %s' % msg)
         else:
             info = self.extract_location_info(loc)
-            print '%s:%d:%d: error: %s\n%s\n%s' % (info.filename, info.line, info.column, msg, info.text, info.arrow)
+            print('%s:%d:%d: error: %s\n%s\n%s' % (info.filename, info.line, info.column, msg, info.text, info.arrow))
             if trace:
                 for l in trace:
                     info = self.extract_location_info(l)
-                    print '    %s:%d:%d\n    %s\n    %s' % (info.filename, info.line, info.column, info.text, info.arrow)
+                    print('    %s:%d:%d\n    %s\n    %s' % (info.filename, info.line, info.column, info.text, info.arrow))
 
         self.errors += 1
 

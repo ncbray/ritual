@@ -1,13 +1,11 @@
 from ritual import base
 import unittest
 
-class Foo(object):
-    __metaclass__ = base.TreeMeta
+class Foo(object, metaclass=base.TreeMeta):
     __schema__ = 'num:int@[no_compare] a:string b:string'
 
 
-class Bar(object):
-    __metaclass__ = base.TreeMeta
+class Bar(object, metaclass=base.TreeMeta):
     __schema__ = 'num:int foo:Foo'
 
 

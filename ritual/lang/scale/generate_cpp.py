@@ -1,6 +1,6 @@
 from ritual.base import TypeDispatcher, dispatch
 import ritual.base.io
-import model
+from . import model
 
 
 class Generator(object):
@@ -42,8 +42,7 @@ INTRINSIC_MAP['bool'] = 'bool'
 INTRINSIC_MAP['string'] = 'std::string'
 
 
-class GenerateTypeRef(object):
-    __metaclass__ = TypeDispatcher
+class GenerateTypeRef(object, metaclass=TypeDispatcher):
 
     @dispatch(model.IntegerType)
     def visitIntegerType(cls, node, gen):
@@ -95,8 +94,7 @@ def gen_params(params, gen):
         gen_param(p, gen)
 
 
-class GenerateDeclarations(object):
-    __metaclass__ = TypeDispatcher
+class GenerateDeclarations(object, metaclass=TypeDispatcher):
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
@@ -111,8 +109,7 @@ class GenerateDeclarations(object):
         gen.out.write(');\n')
 
 
-class GenerateTarget(object):
-    __metaclass__ = TypeDispatcher
+class GenerateTarget(object, metaclass=TypeDispatcher):
 
     @dispatch(model.SetLocal)
     def visitSetLocal(cls, node, value, gen):
@@ -207,8 +204,7 @@ def implemented_as_ptr(t):
     return isinstance(t, model.Struct) and t.is_ref
 
 
-class GenerateExpr(object):
-    __metaclass__ = TypeDispatcher
+class GenerateExpr(object, metaclass=TypeDispatcher):
 
     @dispatch(model.BooleanLiteral)
     def visitBooleanLiteral(cls, node, used, gen):
@@ -436,8 +432,7 @@ def gen_void(node, gen):
         gen.out.write(expr).write(';\n')
 
 
-class GenerateSource(object):
-    __metaclass__ = TypeDispatcher
+class GenerateSource(object, metaclass=TypeDispatcher):
 
     @classmethod
     def declare_locals(self, lcls, skip, gen):

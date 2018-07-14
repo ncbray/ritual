@@ -1,7 +1,7 @@
 from ritual.base import TypeDispatcher, dispatch
 from collections import OrderedDict
-import model
-import parser
+from . import model
+from . import parser
 
 POISON_EXPR = model.PoisonExpr()
 POISON_TARGET = model.PoisonTarget()
@@ -87,8 +87,7 @@ def make_function_type(params, returns, semantic):
     return t
 
 
-class IndexNamespace(object):
-    __metaclass__ = TypeDispatcher
+class IndexNamespace(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.TestDecl)
     def visitTestDecl(cls, node, module, semantic):
@@ -172,8 +171,7 @@ class IndexNamespace(object):
         module.funcs = funcs
 
 
-class ResolveType(object):
-    __metaclass__ = TypeDispatcher
+class ResolveType(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.NamedTypeRef)
     def visitNamedTypeRef(self, node, semantic):
@@ -189,8 +187,7 @@ class ResolveType(object):
         return obj
 
 
-class ResolveInheritance(object):
-    __metaclass__ = TypeDispatcher
+class ResolveInheritance(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.ImportDecl, parser.TestDecl, parser.FuncDecl, parser.ExternFuncDecl)
     def visitLeaf(cls, node, module, semantic):
@@ -231,8 +228,7 @@ def all_fields(s):
     return parent_fields + s.fields
 
 
-class ResolveSignatures(object):
-    __metaclass__ = TypeDispatcher
+class ResolveSignatures(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.FuncDecl)
     def visitFuncDecl(cls, node, f, semantic):
@@ -301,8 +297,7 @@ class ResolveSignatures(object):
                 cls.visit(decl, obj, semantic)
 
 
-class PrintableTypeName(object):
-    __metaclass__ = TypeDispatcher
+class PrintableTypeName(object, metaclass=TypeDispatcher):
 
     @dispatch(model.IntrinsicType)
     def visitIntrinsicType(cls, node):
@@ -412,8 +407,7 @@ def check_can_hold(loc, a, b, semantic):
     return ok
 
 
-class ResolveAssignmentTarget(object):
-    __metaclass__ = TypeDispatcher
+class ResolveAssignmentTarget(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.GetName)
     def visitGetName(cls, node, value_type, is_let, semantic):
@@ -510,8 +504,7 @@ class ResolveAssignmentTarget(object):
         return POISON_TARGET, defines
 
 
-class ResolveMatcher(object):
-    __metaclass__ = TypeDispatcher
+class ResolveMatcher(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.StructMatch)
     def visitStructMatch(cls, node, t, semantic):
@@ -520,8 +513,7 @@ class ResolveMatcher(object):
         return model.StructMatch(mt)
 
 
-class ResolveCode(object):
-    __metaclass__ = TypeDispatcher
+class ResolveCode(object, metaclass=TypeDispatcher):
 
     @classmethod
     def visit_expr_list(cls, exprs, semantic):

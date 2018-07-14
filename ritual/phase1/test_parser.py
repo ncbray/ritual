@@ -1,7 +1,9 @@
 import unittest
+
 from ritual.interpreter.testutil import ParserTestCase
-import model
-import parser
+
+from . import model
+from . import parser
 
 
 def simpleCompile(text):

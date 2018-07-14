@@ -1,5 +1,5 @@
 from ritual import base
-import location
+from . import location
 
 
 types = []
@@ -24,8 +24,7 @@ class Matcher(object):
 
 
 @register
-class Sequence(Matcher):
-    __metaclass__ = base.TreeMeta
+class Sequence(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'children:[]Matcher'
 
     def match(self, parser):
@@ -45,8 +44,7 @@ class Sequence(Matcher):
 
 
 @register
-class Choice(Matcher):
-    __metaclass__ = base.TreeMeta
+class Choice(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'children:[]Matcher'
 
     def match(self, parser):
@@ -69,8 +67,7 @@ class Choice(Matcher):
 
 
 @register
-class Repeat(Matcher):
-    __metaclass__ = base.TreeMeta
+class Repeat(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher min:int max:int'
 
     def match(self, parser):
@@ -92,8 +89,7 @@ class Repeat(Matcher):
 
 
 @register
-class Call(Matcher):
-    __metaclass__ = base.TreeMeta
+class Call(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher args:[]Matcher'
 
     def match(self, parser):
@@ -112,14 +108,12 @@ class Call(Matcher):
 
 
 @register
-class Range(object):
-    __metaclass__ = base.TreeMeta
+class Range(object, metaclass=base.TreeMeta):
     __schema__ = 'lower:rune upper:rune'
 
 
 @register
-class Character(Matcher):
-    __metaclass__ = base.TreeMeta
+class Character(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'ranges:[]Range invert:bool'
 
     def match(self, parser):
@@ -142,8 +136,7 @@ class Character(Matcher):
 
 
 @register
-class MatchValue(Matcher):
-    __metaclass__ = base.TreeMeta
+class MatchValue(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher'
 
     def match(self, parser):
@@ -160,8 +153,7 @@ class MatchValue(Matcher):
 
 
 @register
-class Lookahead(Matcher):
-    __metaclass__ = base.TreeMeta
+class Lookahead(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher invert:bool'
 
     def match(self, parser):
@@ -189,21 +181,19 @@ class Lookahead(Matcher):
 
 
 @register
-class Slice(Matcher):
-    __metaclass__ = base.TreeMeta
+class Slice(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher'
 
     def match(self, parser):
         pos = parser.pos
         result = self.expr.match(parser)
         if parser.ok:
-            result = unicode(parser.stream[pos:parser.pos])
+            result = str(parser.stream[pos:parser.pos])
         return result
 
 
 @register
-class Get(Matcher):
-    __metaclass__ = base.TreeMeta
+class Get(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'name:string'
 
     def match(self, parser):
@@ -218,8 +208,7 @@ class Get(Matcher):
 
 
 @register
-class Set(Matcher):
-    __metaclass__ = base.TreeMeta
+class Set(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher name:string'
 
     def match(self, parser):
@@ -233,8 +222,7 @@ class Set(Matcher):
 
 
 @register
-class Append(Matcher):
-    __metaclass__ = base.TreeMeta
+class Append(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'expr:Matcher name:string'
 
     def match(self, parser):
@@ -254,8 +242,7 @@ class Append(Matcher):
 
 
 @register
-class List(Matcher):
-    __metaclass__ = base.TreeMeta
+class List(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'args:[]Matcher'
 
     def match(self, parser):
@@ -269,8 +256,7 @@ class List(Matcher):
 
 
 @register
-class Literal(Matcher):
-    __metaclass__ = base.TreeMeta
+class Literal(Matcher, metaclass=base.TreeMeta):
     __schema__ = 'value:*'
 
     def match(self, parser):
@@ -278,16 +264,14 @@ class Literal(Matcher):
 
 
 @register
-class Location(Matcher):
-    __metaclass__ = base.TreeMeta
+class Location(Matcher, metaclass=base.TreeMeta):
     __schema__ = ''
 
     def match(self, parser):
         return parser.pos + parser.pos_offset
 
 
-class Param(object):
-    __metaclass__ = base.TreeMeta
+class Param(object, metaclass=base.TreeMeta):
     __schema__ = 'name:string'
 
 
@@ -295,8 +279,7 @@ class Callable(object):
     __slots__ = []
 
 
-class Rule(Callable):
-    __metaclass__ = base.TreeMeta
+class Rule(Callable, metaclass=base.TreeMeta):
     __schema__ = 'name:string params:[]Param body:Matcher'
 
     def call(self, parser, args):
@@ -315,8 +298,7 @@ class Rule(Callable):
         return result
 
 
-class Native(Callable):
-    __metaclass__ = base.TreeMeta
+class Native(Callable, metaclass=base.TreeMeta):
     __schema__ = 'name:string params:[]Param func:*'
 
     def call(self, parser, args):
@@ -335,8 +317,7 @@ def registerInterpreterTypes(p):
 
 
 @register
-class ParseResult(object):
-    __metaclass__ = base.TreeMeta
+class ParseResult(object, metaclass=base.TreeMeta):
     __schema__ = 'value:* pos:int ok:bool error_scope:?string error_location:?location.LocationInfo loc:int'
 
     def error_message(self):
@@ -373,7 +354,6 @@ class Parser(object):
             self.deepest = self.pos
             self.deepest_name = self.stack[-1].name if self.stack else '<EOS>'
         self.ok = False
-        #print
         #self.printStack()
 
     def recover(self, pos):
@@ -388,11 +368,11 @@ class Parser(object):
 
     def printStack(self):
         for frame in reversed(self.stack):
-            print '    %-25s %r' % (frame.name, frame.scope)
+            print('    %-25s %r' % (frame.name, frame.scope))
 
     def internalError(self, node, msg):
-        print msg
-        print node
+        print(msg)
+        print(node)
         self.printStack()
         raise Exception(msg)
 
@@ -401,8 +381,8 @@ class Parser(object):
         return '%d:%d @ %s (%s)\n%s\n%s' % (info.line, info.column, info.character, self.deepest_name, info.text, info.arrow)
 
     def parse(self, name, args, text, loc=0, must_consume_everything=False):
-        assert isinstance(name, basestring), type(name)
-        assert isinstance(text, basestring), type(text)
+        assert isinstance(name, str), type(name)
+        assert isinstance(text, str), type(text)
         assert isinstance(loc, int), type(loc)
         self.stream = text
         self.pos_offset = loc

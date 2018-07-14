@@ -151,8 +151,8 @@ class SchemaParser(object):
 
 
 python_types = {
-    'string': 'basestring',
-    'rune': 'basestring',
+    'string': 'str',
+    'rune': 'str',
 }
 
 
@@ -187,7 +187,6 @@ def gen_validation(fn, ft, indent):
             src += child_src
     elif isinstance(ft, NamedType):
         ft = python_types.get(ft.name, ft.name)
-        #src += indent + 'print %r, %s\n' % (ft, ft)
         src += indent + 'assert isinstance(%s, %s), (type(self), type(%s))\n' % (fn, ft, fn)
     elif isinstance(ft, NullableType):
         src += indent + 'if %s is not None:\n' % (fn,)
@@ -249,6 +248,11 @@ class TreeMeta(type):
                     parts.append('self.%s == other.%s' % (f.name, f.name))
             src += '  return self is other or %s\n' % ' and '.join(parts)
 
+        # TODO value types vs. identity types.
+        if '__hash__' not in dct:
+            src += '\ndef __hash__(self):\n'
+            src += '  return id(self)'
+
 
         if '__repr__' not in dct:
             args = ['type(self).__name__']
@@ -270,7 +274,7 @@ class TreeMeta(type):
             pkg = cls_globals['__name__']
             qual = pkg + '.' if pkg else ''
             code = compile(src, 'TreeMeta<%s%s>' % (qual, name), 'exec')
-            exec code in cls_globals, dct
+            exec(code, cls_globals, dct)
 
         return super(TreeMeta, cls).__new__(cls, name, parents, dct)
 
@@ -294,7 +298,7 @@ class TypeDispatcher(type):
     def __new__(cls, cls_name, parents, dct):
         d = {}
         remove = []
-        for name, f in dct.iteritems():
+        for name, f in dct.items():
             if not hasattr(f, '__dispatch__'):
                 continue
             for t in f.__dispatch__:

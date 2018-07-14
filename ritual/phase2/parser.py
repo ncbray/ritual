@@ -1,5 +1,5 @@
 externs = {
-    'chr': unichr,
+    'chr': chr,
     'chars_to_string': lambda chars: ''.join(chars),
     'hex_to_int': lambda text: int(text, 16),
     'dec_to_int': lambda text: int(text, 10),

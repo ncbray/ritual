@@ -1,11 +1,10 @@
 from ritual.base import TypeDispatcher, dispatch
-import cStringIO
 import os.path
 import ritual.interpreter.location
 
-import parser
-import semantic
-import generate_cpp
+from . import parser
+from . import semantic
+from . import generate_cpp
 
 class ModuleLoader(object):
     def __init__(self, system, root, status):
@@ -46,8 +45,7 @@ class ModuleLoader(object):
             self.status.error('cannot find module "%s"' % '.'.join(path), loc)
 
 
-class FindImports(object):
-    __metaclass__ = TypeDispatcher
+class FindImports(object, metaclass=TypeDispatcher):
 
     @dispatch(parser.ImportDecl)
     def visitImportDecl(cls, node, loader):

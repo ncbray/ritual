@@ -1,16 +1,15 @@
-import cStringIO
+import io
 
 from ritual.base import TypeDispatcher, dispatch, python_types
 import ritual.base.io
 from ritual import interpreter
-import model
+from . import model
 
 alternate_tree_names = {
     'location': 'int',
 }
 
-class TreeType(object):
-    __metaclass__ = TypeDispatcher
+class TreeType(object, metaclass=TypeDispatcher):
 
     @dispatch(model.IntrinsicType)
     def visitIntrinsicType(cls, node):
@@ -34,8 +33,7 @@ class TreeType(object):
         return cls.visit(node.t)
 
 
-class PythonType(object):
-    __metaclass__ = TypeDispatcher
+class PythonType(object, metaclass=TypeDispatcher):
 
     @dispatch(model.StructType)
     def visitStructType(cls, node):
@@ -58,10 +56,9 @@ alternate_names = {
     'BoolLiteral': 'Literal',
 }
 
-class GenerateInterpreter(object):
-    __metaclass__ = TypeDispatcher
+class GenerateInterpreter(object, metaclass=TypeDispatcher):
 
-    @dispatch(int, str, unicode, bool)
+    @dispatch(int, str, bool)
     def visitIntrinstic(cls, node):
         return node
 
@@ -112,10 +109,9 @@ class GenerateInterpreter(object):
         return tgt(*args)
 
 
-class SerializeInterpreter(object):
-    __metaclass__ = TypeDispatcher
+class SerializeInterpreter(object, metaclass=TypeDispatcher):
 
-    @dispatch(int, str, unicode, bool)
+    @dispatch(int, str, bool)
     def visitIntrinstic(cls, node, out):
         out.write(repr(node))
 
@@ -158,15 +154,13 @@ class SerializeInterpreter(object):
         out.write(')')
 
 
-class GeneratePython(object):
-    __metaclass__ = TypeDispatcher
+class GeneratePython(object, metaclass=TypeDispatcher):
 
     @dispatch(model.StructDecl)
     def visitStruct(cls, node, out):
         out.write('\n\n')
-        out.write('class %s(object):\n' % node.name.text)
+        out.write('class %s(object, metaclass=base.TreeMeta):\n' % node.name.text)
         with out.block():
-            out.write('__metaclass__ = base.TreeMeta\n')
             field_text = []
             for f in node.fields:
                 field_text.append('%s:%s' % (f.name.text, TreeType.visit(f.t)))
@@ -236,11 +230,11 @@ class GeneratePython(object):
 
 
 def generate_source(f):
-    out = ritual.base.io.TabbedWriter(cStringIO.StringIO())
+    out = ritual.base.io.TabbedWriter(io.StringIO())
     GeneratePython.visit(f, out)
     return out.out.getvalue()
 
 
 def compile_source(name, src, out_dict):
     code = compile(src, name, 'exec')
-    exec code in out_dict
+    exec(code, out_dict)

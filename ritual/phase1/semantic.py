@@ -1,5 +1,5 @@
 from ritual.base import TypeDispatcher, dispatch
-import model
+from . import model
 
 
 def cached_list_type(node, t, semantic):
@@ -54,11 +54,11 @@ class SemanticPass(object):
         self.current_rule = None
 
     def globalIsUsed(self, name):
-        assert isinstance(name, basestring), name
+        assert isinstance(name, str), name
         self.global_refs.add(name)
 
     def resolveSlot(self, name, is_use):
-        assert isinstance(name, basestring), name
+        assert isinstance(name, str), name
         if name in self.locals:
             if is_use:
                 self.local_refs.add(name)
@@ -69,7 +69,7 @@ class SemanticPass(object):
             return self.globals[name]
 
     def declareGlobal(self, name, t, loc):
-        assert isinstance(name, basestring), name
+        assert isinstance(name, str), name
         assert not isinstance(t, model.VoidType)
         if name in self.globals:
             self.status.error('Attempted to redefine "%s"' % name, loc)
@@ -79,7 +79,7 @@ class SemanticPass(object):
             self.globals[name] = t
 
     def setLocal(self, name, t, loc):
-        assert isinstance(name, basestring), name
+        assert isinstance(name, str), name
         assert isinstance(t, model.Type), t
         assert not isinstance(t, model.VoidType), name
         if name in self.locals:
@@ -97,8 +97,7 @@ class SemanticPass(object):
         return lcl
 
 
-class IndexGlobals(object):
-    __metaclass__ = TypeDispatcher
+class IndexGlobals(object, metaclass=TypeDispatcher):
 
     @dispatch(model.File)
     def visitFile(cls, node, semantic):
@@ -135,8 +134,7 @@ class IndexGlobals(object):
         semantic.declareGlobal(name, t, node.name.loc)
 
 
-class GetLoc(object):
-    __metaclass__ = TypeDispatcher
+class GetLoc(object, metaclass=TypeDispatcher):
 
     @dispatch(model.ListRef)
     def visitListRef(cls, node):
@@ -167,8 +165,7 @@ class GetLoc(object):
         return cls.visit(node.expr)
 
 
-class ResolveType(object):
-    __metaclass__ = TypeDispatcher
+class ResolveType(object, metaclass=TypeDispatcher):
 
     @dispatch(model.NameRef)
     def visitNameRef(cls, node, semantic):
@@ -193,8 +190,7 @@ class ResolveType(object):
         return node.t
 
 
-class CheckSignatures(object):
-    __metaclass__ = TypeDispatcher
+class CheckSignatures(object, metaclass=TypeDispatcher):
 
     @dispatch(model.File)
     def visitFile(cls, node, semantic):
@@ -251,8 +247,7 @@ class CheckSignatures(object):
         nt.rt = rt
 
 
-class CheckRules(object):
-    __metaclass__ = TypeDispatcher
+class CheckRules(object, metaclass=TypeDispatcher):
 
     @dispatch(model.File)
     def visitFile(cls, node, semantic):
@@ -515,8 +510,7 @@ class CheckRules(object):
         return node, semantic.intrinsics['bool']
 
 
-class CheckUsed(object):
-    __metaclass__ = TypeDispatcher
+class CheckUsed(object, metaclass=TypeDispatcher):
 
     @dispatch(model.File)
     def visitFile(cls, node, semantic):
@@ -530,8 +524,7 @@ class CheckUsed(object):
             semantic.status.error('Unused global "%s"' % name, node.name.loc)
 
 
-class Simplify(object):
-    __metaclass__ = TypeDispatcher
+class Simplify(object, metaclass=TypeDispatcher):
 
     @dispatch(list)
     def visitList(cls, node):
@@ -539,7 +532,7 @@ class Simplify(object):
             cls.visit(child)
 
     @dispatch(model.Token, model.Param, model.NameRef, model.ListRef, model.DirectRef,
-        model.GetLocal, model.Character, bool, str, unicode, int, model.Local,
+        model.GetLocal, model.Character, bool, str, int, model.Local,
         model.Attribute, model.StringLiteral, model.BoolLiteral, model.IntLiteral,
         model.RuneLiteral, model.Location, model.RuleType, model.ExternType)
     def visitLeaf(cls, node):

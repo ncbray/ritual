@@ -1,6 +1,7 @@
 from ritual.base import TypeDispatcher, dispatch
 import ritual.base.io
-import model
+
+from . import model
 
 
 def remote_name(port):
@@ -34,8 +35,7 @@ def generate_edge_setter(expr, port, port_name, out):
             assert False, port
 
 
-class GeneratePython(object):
-    __metaclass__ = TypeDispatcher
+class GeneratePython(object, metaclass=TypeDispatcher):
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, out):

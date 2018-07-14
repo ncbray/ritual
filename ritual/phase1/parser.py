@@ -2,10 +2,10 @@ from ritual.interpreter import Parser, Rule, Native, Param
 import ritual.interpreter.location
 import ritual.phase0.parser
 
-import generate_python
-import model
-import optimize
-import semantic
+from . import generate_python
+from . import model
+from . import optimize
+from . import semantic
 
 p = Parser()
 
@@ -15,7 +15,7 @@ def rule(name, body):
 def halt():
     import pdb;pdb.set_trace()
 
-p.rule(Native('chr', [Param('i')], unichr))
+p.rule(Native('chr', [Param('i')], chr))
 p.rule(Native('hex_to_int', [Param('text')], lambda text: int(text, 16)))
 p.rule(Native('dec_to_int', [Param('text')], lambda text: int(text, 10)))
 p.rule(Native('chars_to_string', [Param('chars')], lambda chars: ''.join(chars)))

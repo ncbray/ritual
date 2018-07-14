@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 import collections
-import cStringIO
+import io
 import os.path
 import optparse
 import sys
@@ -51,7 +51,7 @@ def file_is_same(path, text):
 # Note: this isn't complete - it can miss dynamically generated code from non-python files.
 # But close enough.
 def get_loaded_python_files(files):
-    for name, m in sys.modules.iteritems():
+    for name, m in sys.modules.items():
         if not m or not hasattr(m, '__file__'):
             continue
         fn = m.__file__
@@ -68,7 +68,7 @@ def main():
     status = ritual.interpreter.location.CompileStatus()
     p, files = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
     status.halt_if_errors()
-    buf = cStringIO.StringIO()
+    buf = io.StringIO()
     ritual.lang.scale.generate_cpp.generate_source(p, buf)
     src = buf.getvalue()
 
