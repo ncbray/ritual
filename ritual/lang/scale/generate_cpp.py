@@ -12,12 +12,12 @@ class Generator(object):
 
 
     def alloc_temp(self):
-        tmp = 'tmp_%d' % self.tmp_id
+        tmp = f'tmp_{self.tmp_id}'
         self.tmp_id += 1
         return tmp
 
     def alloc_label(self):
-        tmp = 'label_%d' % self.label_id
+        tmp = f'label_{self.label_id}'
         self.label_id += 1
         return tmp
 
@@ -26,13 +26,14 @@ class Generator(object):
         if name is not None:
             return name
 
+        module_name = obj.module.name.replace('.', '_')
         if isinstance(obj, model.Function) or isinstance(obj, model.ExternFunction):
-            name = 'fn_%s_%s' % (obj.module.name.replace('.', '_'), obj.name)
+            prefix = 'fn'
         elif isinstance(obj, model.Struct):
-            name = 's_%s_%s' % (obj.module.name.replace('.', '_'), obj.name)
+            prefix = 's'
         else:
             assert False, obj
-
+        name = f'{prefix}_{module_name}_{obj.name}'
         self.names[obj] = name
         return name
 
@@ -46,10 +47,7 @@ class GenerateTypeRef(object, metaclass=TypeDispatcher):
 
     @dispatch(model.IntegerType)
     def visitIntegerType(cls, node, gen):
-        if node.unsigned:
-            return 'uint%d_t' % node.width
-        else:
-            return 'int%d_t' % node.width
+        return f'{"u" if node.unsigned else ""}int{node.width}_t'
 
     @dispatch(model.FloatType)
     def visitFloatType(cls, node, gen):
@@ -68,7 +66,7 @@ class GenerateTypeRef(object, metaclass=TypeDispatcher):
     def visitStruct(cls, node, gen):
         name = gen.get_name(node)
         if node.is_ref:
-            return 'std::shared_ptr<%s>' % name
+            return f'std::shared_ptr<{name}>'
         else:
             return name
 
@@ -77,7 +75,7 @@ class GenerateTypeRef(object, metaclass=TypeDispatcher):
         if not node.children:
             return 'void'
         children = [cls.visit(child, gen) for child in node.children]
-        return 'std::tuple<%s>' % ', '.join(children)
+        return f'std::tuple<{", ".join(children)}>'
 
 
 def gen_param(p, gen):
@@ -125,7 +123,7 @@ class GenerateTarget(object, metaclass=TypeDispatcher):
     @dispatch(model.DestructureTuple)
     def visitDestructureTuple(cls, node, value, gen):
         for i, tgt in enumerate(node.args):
-            cls.visit(tgt, 'std::get<%d>(%s)' % (i, value), gen)
+            cls.visit(tgt, f'std::get<{i}>({value})', gen)
 
     @dispatch(model.DestructureStruct)
     def visitDestructureStruct(cls, node, value, gen):
@@ -141,7 +139,7 @@ class GenerateTarget(object, metaclass=TypeDispatcher):
         assert len(all_fields) == len(node.args)
         for i, tgt in enumerate(node.args):
             f = all_fields[i]
-            cls.visit(tgt, '%s%s%s' % (value, deref, f.name), gen)
+            cls.visit(tgt, f'{value}{deref}{f.name}', gen)
 
 
 escapes = {
@@ -179,16 +177,17 @@ binop_prec = {
 
 
 def escape_char(c):
+    oc = ord(c)
     if c in escapes:
         return escapes[c]
     elif is_printable_ascii(c):
         return c
-    elif ord(c) < 256:
-        return '\\x%02x' % ord(c)
-    elif ord(c) < 65536:
-        return '\\u%04x' % ord(c)
+    elif oc < 256:
+        return f'\\x{oc:02x}'
+    elif oc < 65536:
+        return f'\\u{oc:04x}'
     else:
-        return '\\U%08x' % ord(c)
+        return f'\\U{oc:08x}'
 
 
 def is_printable_ascii(c):
@@ -196,8 +195,7 @@ def is_printable_ascii(c):
 
 
 def string_literal(s):
-    chars = [escape_char(c) for c in s]
-    return 'u8"' + ''.join(chars) + '"'
+    return f'u8"{"".join([escape_char(c) for c in s])}"'
 
 
 def implemented_as_ptr(t):
@@ -232,16 +230,18 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
     def visitConstructor(cls, node, used, gen):
         args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
         t_name = gen.get_name(node.t)
+        arg_list = ', '.join(args)
         if node.t.is_ref:
-            return 'std::make_shared<%s>(%s)' % (t_name, ', '.join(args)), 2, True, True
+            return f'std::make_shared<{t_name}>({arg_list})', 2, True, True
         else:
-            return '%s{%s}' % (t_name, ', '.join(args)), 2, True, False
+            return f'{t_name}{{{arg_list}}}', 2, True, False
 
     @dispatch(model.DirectCall)
     def visitDirectCall(cls, node, used, gen):
         args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
         func_name = gen.get_name(node.f)
-        return '%s(%s)' % (func_name, ', '.join(args)), 2, True, implemented_as_ptr(node.f.t.rt)
+        arg_list = ', '.join(args)
+        return f'{func_name}({arg_list})', 2, True, implemented_as_ptr(node.f.t.rt)
 
     @dispatch(model.DirectMethodCall)
     def visitDirectMethodCall(cls, node, used, gen):
@@ -249,13 +249,15 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
         args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
         name = node.f.name
         deref = '->' if is_ptr else '.'
-        return '%s%s%s(%s)' % (expr, deref, name, ', '.join(args)), 2, True, implemented_as_ptr(node.f.t.rt)
+        arg_list = ', '.join(args)
+        return f'{expr}{deref}{name}({arg_list})', 2, True, implemented_as_ptr(node.f.t.rt)
 
     @dispatch(model.TupleLiteral)
     def visitTupleLiteral(cls, node, used, gen):
         if used:
             args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
-            return 'std::make_tuple(' + ', '.join(args) + ')', 2, False, False
+            arg_list = ', '.join(args)
+            return f'std::make_tuple({arg_list})', 2, False, False
         else:
             for arg in node.args:
                 gen_void(arg, gen)
@@ -271,7 +273,7 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
         expr, is_ptr = gen_arg(node.expr, prec, gen)
         # TODO: has side effect?
         deref = '->' if is_ptr else '.'
-        return expr + deref + node.field.name, prec, False, implemented_as_ptr(node.field.t)
+        return f'{expr}{deref}{node.field.name}', prec, False, implemented_as_ptr(node.field.t)
 
     @dispatch(model.Sequence)
     def visitSeqeunce(cls, node, used, gen):
@@ -305,10 +307,10 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
         if isinstance(node.t, model.IntegerType) and node.t.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
             t = GenerateTypeRef.visit(node.t, gen)
             tmp = 'unsigned int' if node.t.unsigned else 'int'
-            expr = '(%s)((%s)%s %s (%s)%s)' % (t, tmp, left, node.op, tmp, right)
+            expr = f'({t})(({tmp}){left} {node.op} ({tmp}){right})'
             prec = 3
         else:
-            expr = '%s %s %s' % (left, node.op, right)
+            expr = f'{left} {node.op} {right}'
         # TODO: has side effect?
         return expr, prec, False, False
 
@@ -336,7 +338,7 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
         gen.out.write('while (true) {\n')
         with gen.out.block():
             cond, _, _, _ = cls.visit(node.cond, True, gen)
-            gen.out.write('if (!(%s)) break;\n' % cond)
+            gen.out.write(f'if (!({cond})) break;\n')
             gen_void(node.body, gen)
         gen.out.write('}\n')
         return None, 0, True, False
@@ -352,17 +354,17 @@ def gen_arg(node, containing_prec, gen, always_capture=False):
         # Declare the tmp var.
         t = GenerateTypeRef.visit(node.t, gen)
         tmp = gen.alloc_temp()
-        gen.out.write('%s %s = %s;\n' % (t, tmp, expr))
+        gen.out.write(f'{t} {tmp} = {expr};\n')
         return tmp, is_ptr
     else:
         if containing_prec < prec:
-            expr = '(%s)' % expr
+            expr = f'({expr})'
         return expr, is_ptr
 
 
 def gen_if(node, target, gen):
     cond, _, _, _ = GenerateExpr.visit(node.cond, True, gen)
-    gen.out.write('if (%s) {\n' % cond)
+    gen.out.write(f'if ({cond}) {{\n')
     with gen.out.block():
         gen_capture(node.tbody, target, gen)
     if not is_nop(node.fbody):
@@ -378,8 +380,8 @@ def gen_matcher(node, expr, next, gen):
     t = GenerateTypeRef.visit(node.t, gen)
     tmp = gen.alloc_temp()
     t_name = gen.get_name(node.t)
-    gen.out.write('%s %s = std::dynamic_pointer_cast<%s>(%s);\n' % (t, tmp, t_name, expr))
-    gen.out.write('if (%s == nullptr) goto ' % tmp).write(next).write(';\n')
+    gen.out.write(f'{t} {tmp} = std::dynamic_pointer_cast<{t_name}>({expr});\n')
+    gen.out.write(f'if ({tmp} == nullptr) goto {next};\n')
 
 
 def gen_match(node, target, gen):
@@ -395,7 +397,7 @@ def gen_match(node, target, gen):
         first = i == 0
         last = i == len(node.cases) - 1
         if not first:
-            gen.out.write(next).write(':\n')
+            gen.out.write(f'{next}:\n')
         next = gen.alloc_label()
 
         gen.out.write('{\n')
@@ -403,16 +405,16 @@ def gen_match(node, target, gen):
             gen_matcher(case.matcher, cond, next, gen)
             gen_capture(case.expr, target, gen)
             # Jump to the exit.
-            gen.out.write('goto ').write(done).write(';\n')
+            gen.out.write(f'goto {done};\n')
 
         gen.out.write('}\n')
 
     # TODO better validation.
-    gen.out.write(next).write(':\n')
+    gen.out.write(f'{next}:\n')
     gen.out.write('abort();\n')
 
     # Exit
-    gen.out.write(done).write(':\n')
+    gen.out.write(f'{done}:\n')
 
 
 def gen_capture(node, target, gen):
@@ -421,7 +423,7 @@ def gen_capture(node, target, gen):
             gen_if(node, target, gen)
         else:
             expr, _, _, _ = GenerateExpr.visit(node, True, gen)
-            gen.out.write('%s = %s;\n' % (target, expr))
+            gen.out.write(f'{target} = {expr};\n')
     else:
         gen_void(node, gen)
 
@@ -429,7 +431,7 @@ def gen_capture(node, target, gen):
 def gen_void(node, gen):
     expr, _, impure, _ = GenerateExpr.visit(node, False, gen)
     if expr and impure:
-        gen.out.write(expr).write(';\n')
+        gen.out.write(f'{expr};\n')
 
 
 class GenerateSource(object, metaclass=TypeDispatcher):
@@ -439,7 +441,7 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         for lcl in lcls:
             if lcl in skip:
                 continue
-            gen.out.write(GenerateTypeRef.visit(lcl.t, gen)).write(' ').write(lcl.name).write(';\n')
+            gen.out.write(GenerateTypeRef.visit(lcl.t, gen)).write(f' {lcl.name};\n')
 
     @dispatch(model.Function)
     def visitFunction(cls, node, gen):
@@ -456,7 +458,7 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         gen.out.write(GenerateTypeRef.visit(node.t.rt, gen))
 
         name = node.name if is_method else gen.get_name(node)
-        gen.out.write(' ').write(name).write('(')
+        gen.out.write(f' {name}(')
         gen_params(node.params, gen)
         gen.out.write(') ')
         if node.overrides:
@@ -477,12 +479,13 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             if is_void:
                 gen_void(node.body, gen)
             else:
-                gen.out.write('return ' + gen_arg(node.body, 16, gen)[0]).write(';\n')
+                expr = gen_arg(node.body, 16, gen)[0]
+                gen.out.write(f'return {expr};\n')
         gen.out.write('}\n')
 
     @dispatch(model.Field)
     def visitField(cls, node, gen):
-        gen.out.write(GenerateTypeRef.visit(node.t, gen)).write(' ').write(node.name).write(';\n')
+        gen.out.write(GenerateTypeRef.visit(node.t, gen)).write(f' {node.name};\n')
 
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
@@ -523,7 +526,7 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             for f in local_fields:
                 if dirty:
                     gen.out.write(', ')
-                gen.out.write(f.name).write('(').write(f.name).write(')')
+                gen.out.write(f'{f.name}({f.name})')
                 dirty = True
 
             gen.out.write(' {}\n\n')
@@ -548,13 +551,13 @@ class GenerateSource(object, metaclass=TypeDispatcher):
                     gen.out.write(', ')
                 else:
                     gen.out.write(' : ')
-                gen.out.write(f.name).write('(').write(zero).write(')')
+                gen.out.write(f'{f.name}({zero})')
                 dirty = True
 
             gen.out.write(' {}\n\n')
 
             # Tracing destructor.
-            #gen.out.write('~').write(name).write('() {std::cout << "    destroy %s" << std::endl;}\n' % name)
+            #gen.out.write(f'~{name}() {{ std::cout << "    destroy {name}" << std::endl; }}\n')
 
             for f in node.fields:
                 cls.visit(f, gen)
@@ -564,11 +567,12 @@ class GenerateSource(object, metaclass=TypeDispatcher):
 
     @dispatch(model.Test)
     def visitTest(cls, node, module, index, gen):
-        name = 'test_%s_%d' % (module.name.replace('.', '_'), index)
+        module_name = module.name.replace('.', '_')
+        name = f'test_{module_name}_{index}'
 
         gen.tmp_id = 0
         gen.out.write('\n')
-        gen.out.write('static void ').write(name).write('() {\n')
+        gen.out.write(f'static void {name}() {{\n')
         with gen.out.block():
             cls.declare_locals(node.locals, set(), gen)
             gen_void(node.body, gen)
@@ -580,7 +584,7 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         includes = ['cstdint', 'iostream', 'tuple', 'string']
         includes.sort()
         for name in includes:
-            gen.out.write('#include <%s>\n' % name)
+            gen.out.write(f'#include <{name}>\n')
 
         structs = []
         for m in node.modules:
@@ -626,8 +630,8 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             gen.out.write('std::cout << "TESTING" << std::endl;\n')
             gen.out.write('\n')
             for name, m, t in tests:
-                gen.out.write('std::cout << "test " << %s << ": " << %s << "..." << std::endl;\n' % (string_literal(m.name), string_literal(t.desc)))
-                gen.out.write('%s();\n' % name)
+                gen.out.write(f'std::cout << "test " << {string_literal(m.name)} << ": " << {string_literal(t.desc)} << "..." << std::endl;\n')
+                gen.out.write(f'{name}();\n')
             gen.out.write('\n')
             gen.out.write('std::cout << "DONE" << std::endl;\n')
             gen.out.write('std::cout << std::endl;\n')
