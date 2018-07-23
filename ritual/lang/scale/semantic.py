@@ -362,6 +362,7 @@ def flatten_inheritance(s):
     else:
         return [s]
 
+
 def unify_type_pair(a, b):
     if a is b:
         return a
@@ -823,22 +824,31 @@ def check_for_type_loops(p, status):
             check_struct(s)
 
 
-def process(modules, status):
-    semantic = SemanticPass(status)
-
-    ns = semantic.builtins
+def init_builtins(ns):
     ns['bool'] = model.IntrinsicType('bool')
     ns['string'] = model.IntrinsicType('string')
+
+    # Integers
     for w in [8, 16, 32, 64]:
+        # Signed
         name = 'i%d' % w
         ns[name] = model.IntegerType(name, w, False)
+
+        #Unsigned
         name = 'u%d' % w
         ns[name] = model.IntegerType(name, w, True)
+
+    # Floats
     for w in [32, 64]:
         name = 'f%d' % w
         ns[name] = model.FloatType(name, w)
 
-    # Create objects
+
+def process(modules, status):
+    semantic = SemanticPass(status)
+    init_builtins(semantic.builtins)
+
+    # Create module objects
     p = model.Program()
     for m in modules:
         module = model.Module(m.name)
@@ -846,11 +856,13 @@ def process(modules, status):
         semantic.modules[m.name] = module
         p.modules.append(module)
 
+    # Create the objects contained in each module.
     for m in modules:
         module = semantic.modules[m.name]
         IndexNamespace.visit(m, module, semantic)
     status.halt_if_errors()
 
+    # Resolve type inheritance.
     for m in modules:
         module = semantic.modules[m.name]
         ResolveInheritance.visit(m, module, semantic)
@@ -861,14 +873,17 @@ def process(modules, status):
     check_for_type_loops(p, status)
     status.halt_if_errors()
 
+    # Resolve field and parameter types.
     for m in modules:
         module = semantic.modules[m.name]
         ResolveSignatures.visit(m, module, semantic)
     status.halt_if_errors()
 
+    # Now that field are resolved, check there are no loops in value type embedding.
     check_for_type_loops(p, status)
     status.halt_if_errors()
 
+    # Resolve function bodies.
     for m in modules:
         module = semantic.modules[m.name]
         ResolveCode.visit(m, module, semantic)
