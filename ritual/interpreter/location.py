@@ -1,3 +1,6 @@
+import traceback
+import sys
+
 from ritual import base
 
 
@@ -37,10 +40,11 @@ class HaltCompilation(Exception):
 
 
 class CompileStatus(object):
-    def __init__(self):
+    def __init__(self, debug=False):
         self.sources = []
         self.loc = 0
         self.errors = 0
+        self.debug = debug
 
     def add_source(self, filename, text):
         loc = self.loc
@@ -66,6 +70,11 @@ class CompileStatus(object):
                     print('    %s:%d:%d\n    %s\n    %s' % (info.filename, info.line, info.column, info.text, info.arrow))
 
         self.errors += 1
+
+        # Print a fragment of the stack to identify where the error was generated.
+        if self.debug:
+            traceback.print_stack(limit=5, file=sys.stdout)
+            print()
 
     def halt_if_errors(self):
         if self.errors:

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-import collections
+import argparse
 import io
 import os.path
-import optparse
 import sys
 
 import ritual.interpreter.location
@@ -11,34 +10,22 @@ import ritual.lang.scale.compile
 import ritual.lang.scale.generate_cpp
 
 
-CompileConfig = collections.namedtuple('CompileConfig', 'system root module out deps')
-
-
 def parse_args():
-    parser = optparse.OptionParser()
-    parser.add_option("--system", dest="system", metavar="DIR")
-    parser.add_option("--root", dest="root", metavar="DIR")
-    parser.add_option("--module", dest="module", metavar="MODULE")
-    parser.add_option("--deps", dest="deps", metavar="MODULE")
-    parser.add_option("--out", dest="out", metavar="FILE")
+    parser = argparse.ArgumentParser(description='Compile a Scale program.')
+    parser.add_argument('--system', dest='system', required=True, metavar='DIR', help='Directory holding system sources.')
+    parser.add_argument('--root', dest='root', required=True, metavar='DIR', help='Directory holding program sources.')
+    parser.add_argument('--module', dest='module', required=True, metavar='MODULE', help='Name of the module to compile.')
+    parser.add_argument('--deps', dest='deps', metavar='FILE', help='File to output build dependency information.')
+    parser.add_argument('--verbose', action='store_true', help='Print information useful for debugging the compiler.')
+    parser.add_argument('--out', dest='out', required=True, metavar='FILE', help='File to output generated C++ source.')
 
-    (options, args) = parser.parse_args()
-    if not options.system:
-        parser.error('Please specify system dir.')
+    options = parser.parse_args()
     if not os.path.isdir(options.system):
         parser.error('--system should refer to a directory.')
-    if not options.root:
-        parser.error('Please specify source root.')
     if not os.path.isdir(options.root):
         parser.error('--root should refer to a directory.')
-    if not options.module:
-        parser.error('Please specify module.')
-    if not options.out:
-        parser.error('Please specify output.')
 
-    if len(args) != 0:
-        parser.error('No arguments.')
-    return CompileConfig(options.system, options.root, options.module, options.out, options.deps)
+    return options
 
 
 def file_is_same(path, text):
@@ -48,6 +35,8 @@ def file_is_same(path, text):
         return f.read() == text
 
 
+# Get a list of all Python files that have been loaded.
+# This allows a build system to know when the compiler has changed.
 # Note: this isn't complete - it can miss dynamically generated code from non-python files.
 # But close enough.
 def get_loaded_python_files(files):
@@ -64,18 +53,21 @@ def get_loaded_python_files(files):
 
 def main():
     config = parse_args()
+    status = ritual.interpreter.location.CompileStatus(debug=config.verbose)
 
-    status = ritual.interpreter.location.CompileStatus()
+    # Compile
     p, files = ritual.lang.scale.compile.frontend(config.system, config.root, config.module.split('.'), status)
     status.halt_if_errors()
     buf = io.StringIO()
     ritual.lang.scale.generate_cpp.generate_source(p, buf)
     src = buf.getvalue()
 
+    # Write the generated source to disk if it has changed.
     if not file_is_same(config.out, src):
         with open(config.out, 'w') as f:
             f.write(src)
 
+    # List all files used during compilation, to assist the build system.
     if config.deps:
         get_loaded_python_files(files)
         files = sorted(files)
