@@ -45,30 +45,28 @@ INTRINSIC_MAP['string'] = 'std::string'
 
 class GenerateTypeRef(object, metaclass=TypeDispatcher):
 
-    @dispatch(model.IntegerType)
-    def visitIntegerType(cls, node, gen):
-        return f'{"u" if node.unsigned else ""}int{node.width}_t'
-
-    @dispatch(model.FloatType)
-    def visitFloatType(cls, node, gen):
-        if node.width == 32:
-            return 'float'
-        elif node.width == 64:
-            return 'double'
-        else:
-            assert False, node
-
-    @dispatch(model.IntrinsicType)
-    def visitIntrinsicType(cls, node, gen):
-        return INTRINSIC_MAP[node.name]
-
     @dispatch(model.Struct)
     def visitStruct(cls, node, gen):
-        name = gen.get_name(node)
-        if node.is_ref:
-            return f'std::shared_ptr<{name}>'
+        tag = node.tag
+        if isinstance(tag, model.UserTypeTag):
+            name = gen.get_name(node)
+            if node.is_ref:
+                return f'std::shared_ptr<{name}>'
+            else:
+                return name
+        elif isinstance(tag, model.IntegerTypeTag):
+            return f'{"u" if tag.unsigned else ""}int{tag.width}_t'
+        elif isinstance(tag, model.FloatTypeTag):
+            if tag.width == 32:
+                return 'float'
+            elif tag.width == 64:
+                return 'double'
+            else:
+                assert False, node
+        elif isinstance(tag, model.IntrinsicTypeTag):
+            return INTRINSIC_MAP[tag.name]
         else:
-            return name
+            assert False, node.tag
 
     @dispatch(model.TupleType)
     def visitTupleType(cls, node, gen):
@@ -217,7 +215,7 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
     @dispatch(model.FloatLiteral)
     def visitFloatLiteral(cls, node, used, gen):
         literal = node.text
-        if node.t.width == 32:
+        if node.t.tag.width == 32:
             literal += 'f'
         return literal, 0, False, False
 
@@ -303,10 +301,13 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
         prec = binop_prec[node.op]
         left, _ = gen_arg(node.left, prec, gen)
         right, _ = gen_arg(node.right, prec-1, gen)
+
+        # TODO: lookup operators on structs.
+
         # Small ints are automatically upcasted to "int", make sure they stay the same size and signedness.
-        if isinstance(node.t, model.IntegerType) and node.t.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
+        if isinstance(node.t, model.Struct) and isinstance(node.t.tag, model.IntegerTypeTag) and node.t.tag.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
             t = GenerateTypeRef.visit(node.t, gen)
-            tmp = 'unsigned int' if node.t.unsigned else 'int'
+            tmp = 'unsigned int' if node.t.tag.unsigned else 'int'
             expr = f'({t})(({tmp}){left} {node.op} ({tmp}){right})'
             prec = 3
         else:
@@ -539,12 +540,16 @@ class GenerateSource(object, metaclass=TypeDispatcher):
                 gen.out.write(' : ').write(gen.get_name(node.parent)).write('()')
                 dirty = True
             for f in local_fields:
-                if isinstance(f.t, model.IntegerType):
-                    zero = '0'
-                elif isinstance(f.t, model.FloatType):
-                    zero = '0'
-                elif f.t.name == 'bool':
-                    zero = 'false'
+                if isinstance(f.t, model.Struct):
+                    tag = f.t.tag
+                    if isinstance(tag, model.IntegerTypeTag):
+                        zero = '0'
+                    elif isinstance(tag, model.FloatTypeTag):
+                        zero = '0'
+                    elif isinstance(tag, model.IntrinsicTypeTag ) and tag.name == 'bool':
+                        zero = 'false'
+                    else:
+                        continue
                 else:
                     continue
                 if dirty:
@@ -650,7 +655,7 @@ def sort_structs(pending):
                 defer.append(s)
                 continue
             for f in s.fields:
-                if isinstance(f.t, model.Struct) and f.t not in done:
+                if isinstance(f.t, model.Struct) and isinstance(f.t.tag, model.UserTypeTag) and f.t not in done:
                     defer.append(s)
                     break
             else:

@@ -6,16 +6,23 @@ class ModuleType(object, metaclass=TreeMeta):
     __schema__ = ''
 
 
-class IntrinsicType(object, metaclass=TreeMeta):
+class IntrinsicTypeTag(object, metaclass=TreeMeta):
     __schema__ = 'name:string'
 
 
-class IntegerType(object, metaclass=TreeMeta):
+class IntegerTypeTag(object, metaclass=TreeMeta):
     __schema__ = 'name:string width:int unsigned:bool'
 
 
-class FloatType(object, metaclass=TreeMeta):
+class FloatTypeTag(object, metaclass=TreeMeta):
     __schema__ = 'name:string width:int'
+
+
+class UserTypeTag(object, metaclass=TreeMeta):
+    __schema__ = ''
+
+
+TypeTag = (IntrinsicTypeTag, IntegerTypeTag, FloatTypeTag, UserTypeTag)
 
 
 class TupleType(object, metaclass=TreeMeta):
@@ -31,14 +38,14 @@ class Field(object, metaclass=TreeMeta):
 
 
 class Struct(object, metaclass=TreeMeta):
-    __schema__ = 'loc:int name:string is_ref:bool module:Module parent:?Struct@[backedge, no_init] fields:[]Field@[no_init] methods:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
+    __schema__ = 'loc:int name:string is_ref:bool module:Module tag:TypeTag parent:?Struct@[backedge, no_init] fields:[]Field@[no_init] methods:[]Function@[no_init] namespace:OrderedDict@[simple_init]'
 
 
 class PoisonType(object, metaclass=TreeMeta):
     __schema__ = ''
 
 
-Type = (IntrinsicType, IntegerType, FloatType, ModuleType, TupleType, FunctionType, Struct, PoisonType)
+Type = (ModuleType, TupleType, FunctionType, Struct, PoisonType)
 
 
 class GetLocal(object, metaclass=TreeMeta):

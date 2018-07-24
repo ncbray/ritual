@@ -110,7 +110,7 @@ class IndexNamespace(object, metaclass=TypeDispatcher):
     def visitStructDecl(cls, node, module, semantic):
         loc = node.name.loc
         name = node.name.text
-        s = model.Struct(loc, name, node.is_ref, module)
+        s = model.Struct(loc, name, node.is_ref, module, model.UserTypeTag())
         semantic.register(loc, name, s)
 
         fields = []
@@ -257,7 +257,7 @@ class ResolveSignatures(object, metaclass=TypeDispatcher):
             if s.parent:
                 shadowing = struct_lookup(s.parent, name)
                 if shadowing:
-                    if isinstance(f, model.Function) and isinstance(shadowing, model.Function):
+                    if isinstance(f, model.BaseFunction) and isinstance(shadowing, model.BaseFunction):
                         f.overrides = shadowing
                         shadowing.is_overridden = True
                     else:
@@ -299,18 +299,6 @@ class ResolveSignatures(object, metaclass=TypeDispatcher):
 
 class PrintableTypeName(object, metaclass=TypeDispatcher):
 
-    @dispatch(model.IntrinsicType)
-    def visitIntrinsicType(cls, node):
-        return node.name
-
-    @dispatch(model.IntegerType)
-    def visitIntegerType(cls, node):
-        return node.name
-
-    @dispatch(model.FloatType)
-    def visitFloatType(cls, node):
-        return node.name
-
     @dispatch(model.Struct)
     def visitStruct(cls, node):
         return node.name
@@ -343,8 +331,6 @@ def can_hold(a, b):
     if isinstance(a, model.Struct) and isinstance(b, model.Struct):
         if b.parent:
             return can_hold(a, b.parent)
-    if isinstance(a, model.IntrinsicType) and isinstance(b, model.IntrinsicType):
-        return a.name == b.name
     if isinstance(a, model.TupleType) and isinstance(b, model.TupleType):
         if len(a.children) != len(b.children):
             return False
@@ -541,7 +527,7 @@ class ResolveCode(object, metaclass=TypeDispatcher):
             return model.FloatLiteral(loc, value), t
         else:
             # Need to be a little conservative because we don't know if it's a negative literal or not.
-            bits = t.width if t.unsigned else t.width - 1
+            bits = t.tag.width if t.tag.unsigned else t.tag.width - 1
             if value > 2**bits:
                 semantic.status.error('literal of type %s is out of range' % PrintableTypeName.visit(t), loc)
                 return POISON_EXPR, t
@@ -596,7 +582,7 @@ class ResolveCode(object, metaclass=TypeDispatcher):
                 return POISON_EXPR, POISON_TYPE
             if isinstance(f, model.Field):
                 return model.GetField(loc, expr, f, f.t), f.t
-            elif isinstance(f, model.Function):
+            elif isinstance(f, model.BaseFunction):
                 return model.GetMethod(loc, expr, f), f.t
             else:
                 assert False, f
@@ -825,23 +811,31 @@ def check_for_type_loops(p, status):
 
 
 def init_builtins(ns):
-    ns['bool'] = model.IntrinsicType('bool')
-    ns['string'] = model.IntrinsicType('string')
+
+    builtins = model.Module('builtin')
+
+    def make(name, tag):
+        s = model.Struct(0, name, False, builtins, tag)
+        ns[name] = s
+        return s
+
+    make('bool', model.IntrinsicTypeTag('bool'))
+    make('string', model.IntrinsicTypeTag('string'))
 
     # Integers
     for w in [8, 16, 32, 64]:
         # Signed
         name = 'i%d' % w
-        ns[name] = model.IntegerType(name, w, False)
+        make(name, model.IntegerTypeTag(name, w, False))
 
         #Unsigned
         name = 'u%d' % w
-        ns[name] = model.IntegerType(name, w, True)
+        make(name, model.IntegerTypeTag(name, w, True))
 
     # Floats
     for w in [32, 64]:
         name = 'f%d' % w
-        ns[name] = model.FloatType(name, w)
+        make(name, model.FloatTypeTag(name, w))
 
 
 def process(modules, status):
