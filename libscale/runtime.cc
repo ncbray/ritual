@@ -14,11 +14,3 @@ void fn_std_print_string(std::string value) {
 void fn_std_abort() {
   abort();
 }
-
-void run_all_tests(void);
-void entrypoint(void);
-
-int main() {
-  run_all_tests();
-  entrypoint();
-}

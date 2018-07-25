@@ -615,22 +615,15 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             for f in m.funcs:
                 cls.visit(f, gen)
 
-
-        gen.out.write('\n')
-        gen.out.write('void entrypoint(void) {\n')
-        with gen.out.block():
-            gen.out.write(gen.get_name(node.entrypoint)).write('();\n')
-        gen.out.write('}\n')
-
-
         # Tests
         tests = []
         for m in node.modules:
             for i, t in enumerate(m.tests):
                 tests.append((cls.visit(t, m, i, gen), m, t))
 
+        # Run all tests
         gen.out.write('\n')
-        gen.out.write('void run_all_tests(void) {\n')
+        gen.out.write('static void run_all_tests(void) {\n')
         with gen.out.block():
             gen.out.write('std::cout << "TESTING" << std::endl;\n')
             gen.out.write('\n')
@@ -640,6 +633,14 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             gen.out.write('\n')
             gen.out.write('std::cout << "DONE" << std::endl;\n')
             gen.out.write('std::cout << std::endl;\n')
+        gen.out.write('}\n')
+
+        # Main
+        gen.out.write('\n')
+        gen.out.write('int main() {\n')
+        with gen.out.block():
+            gen.out.write('run_all_tests();\n')
+            gen.out.write(gen.get_name(node.entrypoint)).write('();\n')
         gen.out.write('}\n')
 
 
