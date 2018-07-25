@@ -10,7 +10,6 @@ class Generator(object):
         self.tmp_id = 0
         self.label_id = 0
 
-
     def alloc_temp(self):
         tmp = f'tmp_{self.tmp_id}'
         self.tmp_id += 1
@@ -154,24 +153,40 @@ escapes = {
 }
 
 
-binop_prec = {
-    '*': 5,
-    '/': 5,
-    '%': 5,
-    '+': 6,
-    '-': 6,
-    '<<': 7,
-    '>>': 7,
-    '<': 9,
-    '<=': 9,
-    '>': 9,
-    '>=': 9,
-    '==': 10,
-    '!=': 10,
-    '&': 11,
-    '^': 12,
-    '|': 13,
-}
+named_arith_ops = [
+    ('add', '+', 6),
+    ('sub', '-', 6),
+    ('mul', '*', 5),
+    ('div', '/', 5),
+    ('mod', '%', 5),
+]
+
+named_bit_ops = [
+    ('and', '&', 11),
+    ('or', '|', 13),
+    ('xor', '^', 12),
+]
+
+named_compare_ops = [
+    ('eq', '==', 10),
+    ('ne', '!=', 10),
+    ('lt', '<', 9),
+    ('le', '<=', 9),
+    ('gt', '>', 9),
+    ('ge', '>=', 9),
+]
+
+named_all_ops = named_arith_ops + named_bit_ops + named_compare_ops
+
+op_name = {}
+for name, op, prec in named_all_ops:
+    op_name[op] = name
+
+compare_ops = set([op[1] for op in named_compare_ops])
+
+
+def is_printable_ascii(c):
+    return 32 <= ord(c) < 127
 
 
 def escape_char(c):
@@ -188,16 +203,73 @@ def escape_char(c):
         return f'\\U{oc:08x}'
 
 
-def is_printable_ascii(c):
-    return 32 <= ord(c) < 127
-
-
 def string_literal(s):
     return f'u8"{"".join([escape_char(c) for c in s])}"'
 
 
 def implemented_as_ptr(t):
     return isinstance(t, model.Struct) and t.is_ref
+
+
+def gen_runtime_op(op, t, c_type, ret_type, gen):
+    name = op_name[op]
+    gen.out.write(f"""
+static inline {ret_type} op_{t}_{name}({c_type} a, {c_type} b) {{
+    return a {op} b;
+}}
+""")
+
+def gen_runtime_casted_op(op, t, c_type, ret_type, widen, gen):
+    name = op_name[op]
+    gen.out.write(f"""
+static inline {ret_type} op_{t}_{name}({c_type} a, {c_type} b) {{
+    return ({ret_type})(({widen})a {op} ({widen})b);
+}}
+""")
+
+
+
+def gen_runtime(gen):
+    # Integers
+    for width in [8, 16, 32, 64]:
+        for unsigned in [False, True]:
+            t = f'{"u" if unsigned else "i"}{width}'
+            c_type = f'{"u" if unsigned else ""}int{width}_t'
+
+            for name, op, prec in named_arith_ops:
+                if width < 32:
+                    widen = 'unsigned int' if unsigned else 'int'
+                    gen_runtime_casted_op(op, t, c_type, c_type, widen, gen)
+                else:
+                    gen_runtime_op(op, t, c_type, c_type, gen)
+
+            for name, op, prec in named_bit_ops:
+                gen_runtime_op(op, t, c_type, c_type, gen)
+
+            for name, op, prec in named_compare_ops:
+                gen_runtime_op(op, t, c_type, 'bool', gen)
+
+    # Floats
+    for width in [32, 64]:
+        t = f'f{width}'
+        c_type = 'float' if width == 32 else 'double'
+
+        for name, op, prec in named_arith_ops:
+            if op == '%':
+                continue
+            gen_runtime_op(op, t, c_type, c_type, gen)
+
+        for name, op, prec in named_compare_ops:
+            gen_runtime_op(op, t, c_type, 'bool', gen)
+
+    # Boolean
+    t = 'bool'
+    c_type = 'bool'
+    for name, op, prec in named_bit_ops:
+        gen_runtime_op(op, t, c_type, c_type, gen)
+
+    for name, op, prec in named_compare_ops:
+        gen_runtime_op(op, t, c_type, 'bool', gen)
 
 
 class GenerateExpr(object, metaclass=TypeDispatcher):
@@ -298,20 +370,15 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
 
     @dispatch(model.BinaryOp)
     def visitBinaryOp(cls, node, used, gen):
-        prec = binop_prec[node.op]
-        left, _ = gen_arg(node.left, prec, gen)
-        right, _ = gen_arg(node.right, prec-1, gen)
+        left, _ = gen_arg(node.left, 17, gen)
+        right, _ = gen_arg(node.right, 17, gen)
 
         # TODO: lookup operators on structs.
 
-        # Small ints are automatically upcasted to "int", make sure they stay the same size and signedness.
-        if isinstance(node.t, model.Struct) and isinstance(node.t.tag, model.IntegerTypeTag) and node.t.tag.width < 32 and node.op not in ['==', '!=', '<', '<=', '>', '>=']:
-            t = GenerateTypeRef.visit(node.t, gen)
-            tmp = 'unsigned int' if node.t.tag.unsigned else 'int'
-            expr = f'({t})(({tmp}){left} {node.op} ({tmp}){right})'
-            prec = 3
-        else:
-            expr = f'{left} {node.op} {right}'
+        op_type = node.left.t.name # HACK
+        expr = f'op_{op_type}_{op_name[node.op]}({left}, {right})'
+        prec = 2
+
         # TODO: has side effect?
         return expr, prec, False, False
 
@@ -591,11 +658,15 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         for name in includes:
             gen.out.write(f'#include <{name}>\n')
 
+        gen_runtime(gen)
+
+        # Collect all the structs in the program.
         structs = []
         for m in node.modules:
             structs += m.structs
         structs = sort_structs(structs)
 
+        # Forward declarations
         gen.out.write('\n')
         for s in structs:
             GenerateDeclarations.visit(s, gen)

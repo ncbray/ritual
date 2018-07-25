@@ -2,7 +2,7 @@ repo_root = ..
 scale_src = $repo_root/scale_src
 libscale_dir = $repo_root/libscale
 
-flags = -O1 -Werror -Wall -g -fno-omit-frame-pointer -fsanitize=address,undefined
+flags = -O1 -Werror -Wall -Wno-unused-function -g -fno-omit-frame-pointer -fsanitize=address,undefined
 
 rule compile_cpp
   command = clang++ $flags -std=c++14 -c $in -o $out -MD -MF $out.d
