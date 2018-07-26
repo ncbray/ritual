@@ -16,10 +16,7 @@ fn main() {
     let i = 0;
     while i < 5 {
         (a, b) = swap(a-1, b+b);
-        std.print(a.to_string());
-        std.print(" ");
-        std.print(b.to_string());
-        std.print("\n");
+        std.print("(" + a.to_string() + ", " + b.to_string() + ")\n");
         i = i + 1
     }
 }

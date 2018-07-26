@@ -239,6 +239,8 @@ static inline {ret_type} op_{t}_{name}({c_type} a, {c_type} b) {{
 
 
 def gen_runtime(gen):
+    gen_runtime_op('+', 'string', 'std::string', 'std::string', gen)
+
     # Integers
     for width in [8, 16, 32, 64]:
         for unsigned in [False, True]:
