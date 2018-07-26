@@ -18,11 +18,19 @@ struct Vec3 {
 struct SimpleInline {
     n0:i32;
     n1:i32;
+
+    fn swap() {
+        (self.n0, self.n1) = (self.n1, self.n0)
+    }
 }
 
 class SimpleIndirect {
     n0:i32;
     n1:i32;
+
+    fn swap() {
+        (self.n0, self.n1) = (self.n1, self.n0)
+    }
 }
 
 test "struct constructor" {
@@ -151,6 +159,20 @@ test "class alias" {
     let h2 = h1;
     h1.value = 11;
     std.assertEqualI32(h2.value, 11);
+}
+
+test "inline struct mutating method" {
+    let s = SimpleInline(1, 2);
+    s.swap();
+    std.assertEqualI32(s.n0, 2);
+    std.assertEqualI32(s.n1, 1);
+}
+
+test "indirect struct mutating method" {
+    let s = SimpleIndirect(1, 2);
+    s.swap();
+    std.assertEqualI32(s.n0, 2);
+    std.assertEqualI32(s.n1, 1);
 }
 
 test "tuple destructure swap" {

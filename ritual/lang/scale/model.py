@@ -69,7 +69,7 @@ class GetField(object, metaclass=TreeMeta):
 
 
 class GetMethod(object, metaclass=TreeMeta):
-    __schema__ = 'loc:int expr:Expr func:Function@[backedge]'
+    __schema__ = 'loc:int expr:Expr func:BaseFunction@[backedge]'
 
 
 class DirectCall(object, metaclass=TreeMeta):
@@ -79,6 +79,8 @@ class DirectCall(object, metaclass=TreeMeta):
 class DirectMethodCall(object, metaclass=TreeMeta):
     __schema__ = 'loc:int expr:Expr f:BaseFunction@[backedge] args:[]Expr t:Type@[backedge]'
 
+class IndirectMethodCall(object, metaclass=TreeMeta):
+    __schema__ = 'loc:int expr:Expr name:string args:[]Expr t:Type@[backedge]'
 
 class Constructor(object, metaclass=TreeMeta):
     __schema__ = 'loc:int t:Struct@[backedge] args:[]Expr'
@@ -147,7 +149,7 @@ class PoisonExpr(object, metaclass=TreeMeta):
     __schema__ = ''
 
 
-Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, GetMethod, DirectCall, DirectMethodCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, Match, PoisonExpr)
+Expr = (GetLocal, GetType, GetFunction, GetModule, GetField, GetMethod, DirectCall, DirectMethodCall, IndirectMethodCall, Constructor, BooleanLiteral, TupleLiteral, FloatLiteral, IntLiteral, StringLiteral, Assign, Sequence, PrefixOp, BinaryOp, If, While, Match, PoisonExpr)
 
 
 class SetLocal(object, metaclass=TreeMeta):
@@ -186,7 +188,7 @@ class Function(object, metaclass=TreeMeta):
 
 
 class ExternFunction(object, metaclass=TreeMeta):
-    __schema__ = 'loc:int name:string module:Module params:[]Param@[no_init] t:FunctionType@[no_init]'
+    __schema__ = 'loc:int name:string module:Module self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init]'
 
 
 BaseFunction = (Function, ExternFunction)

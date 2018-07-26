@@ -27,12 +27,15 @@ class Generator(object):
 
         module_name = obj.module.name.replace('.', '_')
         if isinstance(obj, model.Function) or isinstance(obj, model.ExternFunction):
-            prefix = 'fn'
+            if obj.self:
+                name = f'm_{module_name}_{obj.self.t.name}_{obj.name}'
+            else:
+                name = f'f_{module_name}_{obj.name}'
         elif isinstance(obj, model.Struct):
-            prefix = 's'
+            name = f's_{module_name}_{obj.name}'
         else:
             assert False, obj
-        name = f'{prefix}_{module_name}_{obj.name}'
+
         self.names[obj] = name
         return name
 
@@ -75,18 +78,21 @@ class GenerateTypeRef(object, metaclass=TypeDispatcher):
         return f'std::tuple<{", ".join(children)}>'
 
 
-def gen_param(p, gen):
-    gen.out.write(GenerateTypeRef.visit(p.t, gen)).write(' ').write(p.name)
+def gen_param(p, as_ref, gen):
+    gen.out.write(GenerateTypeRef.visit(p.t, gen))
+    if as_ref:
+        gen.out.write('&')
+    gen.out.write(' ').write(p.name)
 
 
-def gen_params(params, gen):
+def gen_params(params, out_of_line_method, gen):
     if not params:
         gen.out.write('void')
         return
-    gen_param(params[0], gen)
+    gen_param(params[0], out_of_line_method, gen)
     for p in params[1:]:
         gen.out.write(', ')
-        gen_param(p, gen)
+        gen_param(p, False, gen)
 
 
 class GenerateDeclarations(object, metaclass=TypeDispatcher):
@@ -100,7 +106,10 @@ class GenerateDeclarations(object, metaclass=TypeDispatcher):
         if not isinstance(node, model.ExternFunction):
             gen.out.write('static ')
         gen.out.write(GenerateTypeRef.visit(node.t.rt, gen)).write(' ').write(gen.get_name(node)).write('(')
-        gen_params(node.params, gen)
+        if node.self:
+            gen_params([node.self] + node.params, True, gen)
+        else:
+            gen_params(node.params, False, gen)
         gen.out.write(');\n')
 
 
@@ -317,10 +326,16 @@ class GenerateExpr(object, metaclass=TypeDispatcher):
     def visitDirectMethodCall(cls, node, used, gen):
         expr, is_ptr = gen_arg(node.expr, 2, gen)
         args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
-        name = node.f.name
+        name = gen.get_name(node.f)
+        return f'{name}({", ".join([expr] + args)})', 2, True, implemented_as_ptr(node.t)
+
+    @dispatch(model.IndirectMethodCall)
+    def visitIndirectMethodCall(cls, node, used, gen):
+        expr, is_ptr = gen_arg(node.expr, 2, gen)
+        args = [gen_arg(arg, 17, gen)[0] for arg in node.args]
+        name = node.name
         deref = '->' if is_ptr else '.'
-        arg_list = ', '.join(args)
-        return f'{expr}{deref}{name}({arg_list})', 2, True, implemented_as_ptr(node.f.t.rt)
+        return f'{expr}{deref}{name}({", ".join(args)})', 2, True, implemented_as_ptr(node.t)
 
     @dispatch(model.TupleLiteral)
     def visitTupleLiteral(cls, node, used, gen):
@@ -512,34 +527,45 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             gen.out.write(GenerateTypeRef.visit(lcl.t, gen)).write(f' {lcl.name};\n')
 
     @dispatch(model.Function)
-    def visitFunction(cls, node, gen):
-        is_method = node.self != None
-
+    def visitFunction(cls, node, inline_method, gen):
         gen.tmp_id = 0
         gen.label_id = 0
         gen.out.write('\n')
-        if is_method:
+        if inline_method:
             if node.is_overridden and not node.overrides:
                 gen.out.write('virtual ')
         else:
             gen.out.write('static ')
         gen.out.write(GenerateTypeRef.visit(node.t.rt, gen))
 
-        name = node.name if is_method else gen.get_name(node)
+        declared_params = node.params
+        all_params = set([p.lcl for p in node.params])
+        out_of_line_method = False
+        if node.self != None:
+            all_params.add(node.self.lcl)
+            # HACK
+            if inline_method:
+                self_name = 'this'
+            else:
+                self_name = 'self'
+                declared_params = [node.self] + declared_params
+                out_of_line_method = True
+            node.self.name = self_name
+            node.self.lcl.name = self_name
+
+
+        name = node.name if inline_method else gen.get_name(node)
         gen.out.write(f' {name}(')
-        gen_params(node.params, gen)
+        gen_params(declared_params, out_of_line_method, gen)
         gen.out.write(') ')
-        if node.overrides:
+        if inline_method and node.overrides:
             gen.out.write('override ')
         gen.out.write('{\n')
+
+        # Body
         with gen.out.block():
             # Declare locals
-            params = set([p.lcl for p in node.params])
-            if is_method:
-                # HACK
-                node.self.name = 'this'
-                params.add(node.self)
-            cls.declare_locals(node.locals, params, gen)
+            cls.declare_locals(node.locals, all_params, gen)
 
             # Generate body
             rt = node.t.rt
@@ -634,7 +660,8 @@ class GenerateSource(object, metaclass=TypeDispatcher):
             for f in node.fields:
                 cls.visit(f, gen)
             for m in node.methods:
-                cls.visit(m, gen)
+                # TODO call out-of-line methods, trim delcared methods.
+                cls.visit(m, True, gen)
         gen.out.write('};\n')
 
     @dispatch(model.Test)
@@ -660,10 +687,16 @@ class GenerateSource(object, metaclass=TypeDispatcher):
 
         gen_runtime(gen)
 
-        # Collect all the structs in the program.
+        # Collect all the structs and functions in the program.
         structs = []
+        funcs = []
+        externs = []
         for m in node.modules:
             structs += m.structs
+            funcs += m.funcs
+            externs += m.extern_funcs
+            for s in m.structs:
+                funcs += s.methods
         structs = sort_structs(structs)
 
         # Forward declarations
@@ -671,20 +704,17 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         for s in structs:
             GenerateDeclarations.visit(s, gen)
         gen.out.write('\n')
-        for m in node.modules:
-            for f in m.extern_funcs:
-                GenerateDeclarations.visit(f, gen)
+        for f in externs:
+            GenerateDeclarations.visit(f, gen)
         gen.out.write('\n')
-        for m in node.modules:
-            for f in m.funcs:
-                GenerateDeclarations.visit(f, gen)
+        for f in funcs:
+            GenerateDeclarations.visit(f, gen)
 
         for s in structs:
             cls.visit(s, gen)
 
-        for m in node.modules:
-            for f in m.funcs:
-                cls.visit(f, gen)
+        for f in funcs:
+            cls.visit(f, False, gen)
 
         # Tests
         tests = []

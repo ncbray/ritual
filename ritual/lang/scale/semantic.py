@@ -618,7 +618,11 @@ class ResolveCode(object, metaclass=TypeDispatcher):
             if isinstance(expr, model.GetFunction):
                 return model.DirectCall(loc, expr.f, arg_exprs, et.rt), et.rt
             elif isinstance(expr, model.GetMethod):
-                return model.DirectMethodCall(loc, expr.expr, expr.func, arg_exprs, et.rt), et.rt
+                f = expr.func
+                if f.is_overridden:
+                    return model.IndirectMethodCall(loc, expr.expr, f.name, arg_exprs, et.rt), et.rt
+                else:
+                   return model.DirectMethodCall(loc, expr.expr, f, arg_exprs, et.rt), et.rt
             else:
                 assert False, expr
         elif isinstance(et, model.Struct):
@@ -727,7 +731,10 @@ class ResolveCode(object, metaclass=TypeDispatcher):
         semantic.func = f
         with semantic.namespace(ns):
             if struct:
-                f.self = semantic.define_lcl(f.loc, 'self', struct)
+                name = 'self'
+                p = model.Param(f.loc, name, struct)
+                p.lcl = semantic.define_lcl(f.loc, name, struct)
+                f.self = p
 
             for p in f.params:
                 p.lcl = semantic.define_lcl(p.loc, p.name, p.t)
