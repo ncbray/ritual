@@ -183,7 +183,7 @@ class ResolveType(object, metaclass=TypeDispatcher):
             return POISON_TYPE
         if not isinstance(obj, model.Type):
             semantic.status.error('"%s" does not refer to a type' % name, loc)
-            return POISON_TYPE        
+            return POISON_TYPE
         return obj
 
 
@@ -297,6 +297,7 @@ class ResolveSignatures(object, metaclass=TypeDispatcher):
                 cls.visit(decl, obj, semantic)
 
 
+# TODO: better names for constant modules, etc.
 class PrintableTypeName(object, metaclass=TypeDispatcher):
 
     @dispatch(model.Struct)
@@ -306,6 +307,10 @@ class PrintableTypeName(object, metaclass=TypeDispatcher):
     @dispatch(model.TupleType)
     def visitTupleType(cls, node):
         return '(%s)' % ', '.join([cls.visit(arg) for arg in node.children])
+
+    @dispatch(model.ModuleType)
+    def visitModuleType(cls, node):
+        return 'module'
 
 
 def wrap_obj(loc, obj):
@@ -481,7 +486,7 @@ class ResolveAssignmentTarget(object, metaclass=TypeDispatcher):
             else:
                 semantic.status.error('expected structure with %d fields, but %s has %d fields' % (len(node.args), PrintableTypeName.visit(value_type), len(all_fields)), loc)
         elif not isinstance(value_type, model.PoisonType):
-            semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc) 
+            semantic.status.error('cannot destructure %s as a tuple' % (PrintableTypeName.visit(value_type)), loc)
 
         # Can't validate the destructuring, so validate the children as much as we can and then fail.
         defines = False
@@ -562,7 +567,7 @@ class ResolveCode(object, metaclass=TypeDispatcher):
     @dispatch(parser.GetAttr)
     def visitGetAttr(cls, node, used, semantic):
         loc = node.loc
-        name = node.name.text        
+        name = node.name.text
         expr, t = cls.visit(node.expr, True, semantic)
         assert isinstance(t, model.Type), (node, expr, t)
 
@@ -630,7 +635,7 @@ class ResolveCode(object, metaclass=TypeDispatcher):
             if len(fields) != arg_count:
                 semantic.status.error('expected %d arguments, got %d' % (len(fields), arg_count), loc)
                 return POISON_EXPR, POISON_TYPE
-            
+
             for i in range(arg_count):
                 pt = fields[i].t
                 ae = arg_exprs[i]
@@ -817,17 +822,25 @@ def check_for_type_loops(p, status):
             check_struct(s)
 
 
-def init_builtins(ns):
-
-    builtins = model.Module('builtin')
+def init_builtins(ns, semantic):
+    builtin = model.Module('builtin')
 
     def make(name, tag):
-        s = model.Struct(0, name, False, builtins, tag)
+        s = model.Struct(0, name, False, builtin, tag)
         ns[name] = s
+
+        f = model.ExternFunction(0, 'to_string', builtin)
+        f.self = model.Param(0, 'self', s)
+        f.t = make_function_type([], [ns['string']], semantic)
+
+        s.methods.append(f)
+        s.namespace[f.name] = f
+        builtin.extern_funcs.append(f)
+
         return s
 
-    make('bool', model.IntrinsicTypeTag('bool'))
     make('string', model.IntrinsicTypeTag('string'))
+    make('bool', model.IntrinsicTypeTag('bool'))
 
     # Integers
     for w in [8, 16, 32, 64]:
@@ -844,13 +857,19 @@ def init_builtins(ns):
         name = 'f%d' % w
         make(name, model.FloatTypeTag(name, w))
 
+    return builtin
 
 def process(modules, status):
     semantic = SemanticPass(status)
-    init_builtins(semantic.builtins)
+    module = init_builtins(semantic.builtins, semantic)
 
     # Create module objects
     p = model.Program()
+
+    # Register builtins
+    semantic.modules[module.name] = module
+    p.modules.append(module)
+
     for m in modules:
         module = model.Module(m.name)
         assert m.name not in semantic.modules, m.name

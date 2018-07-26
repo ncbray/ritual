@@ -181,14 +181,14 @@ class Param(object, metaclass=TreeMeta):
 
 class Local(object, metaclass=TreeMeta):
     __schema__ = 'loc:int name:string t:Type'
-    
+
 
 class Function(object, metaclass=TreeMeta):
-    __schema__ = 'loc:int name:string module:Module overrides:Function@[no_init] is_overridden:bool@[no_init] self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
+    __schema__ = 'loc:int name:string module:Module overrides:BaseFunction@[no_init] is_overridden:bool@[no_init] self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init] locals:[]Local@[no_init] body:Expr@[no_init]'
 
 
 class ExternFunction(object, metaclass=TreeMeta):
-    __schema__ = 'loc:int name:string module:Module self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init]'
+    __schema__ = 'loc:int name:string module:Module is_overridden:bool@[no_init] self:Param@[no_init] params:[]Param@[no_init] t:FunctionType@[no_init]'
 
 
 BaseFunction = (Function, ExternFunction)
