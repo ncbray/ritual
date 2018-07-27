@@ -517,60 +517,8 @@ class ResolveCode(object, metaclass=TypeDispatcher):
             types.append(t)
         return values, types
 
-    @dispatch(parser.BooleanLiteral)
-    def visitBooleanLiteral(cls, node, used, semantic):
-        t = semantic.builtins['bool']
-        return model.BooleanLiteral(node.loc, node.value, t), t
-
-    @dispatch(parser.IntLiteral)
-    def visitIntLiteral(cls, node, used, semantic):
-        loc = node.loc
-        t = semantic.builtins[node.postfix]
-        value = int(node.text, node.base)
-
-        if t.name.startswith('f'):
-            return model.FloatLiteral(loc, value), t
-        else:
-            # Need to be a little conservative because we don't know if it's a negative literal or not.
-            bits = t.tag.width if t.tag.unsigned else t.tag.width - 1
-            if value > 2**bits:
-                semantic.status.error('literal of type %s is out of range' % PrintableTypeName.visit(t), loc)
-                return POISON_EXPR, t
-            return model.IntLiteral(loc, value, t), t
-
-    @dispatch(parser.FloatLiteral)
-    def visitFloatLiteral(cls, node, used, semantic):
-        loc = node.loc
-        t = semantic.builtins[node.postfix]
-        assert t.name.startswith('f'), t
-        # TODO error handling.
-        text = node.text
-        value = float(node.text)
-        # TODO flexible types?
-        return model.FloatLiteral(loc, text, value, t), t
-
-    @dispatch(parser.StringLiteral)
-    def visitStringLiteral(cls, node, used, semantic):
-        t = semantic.builtins['string']
-        return model.StringLiteral(node.loc, node.value, t), t
-
-    @dispatch(parser.GetName)
-    def visitGetName(cls, node, used, semantic):
-        loc = node.name.loc
-        name = node.name.text
-        obj = semantic.lookup(name)
-        if obj is None:
-            semantic.status.error('cannot resolve "%s"' % name, loc)
-            return POISON_EXPR, POISON_TYPE
-        return wrap_obj(loc, obj)
-
-    @dispatch(parser.GetAttr)
-    def visitGetAttr(cls, node, used, semantic):
-        loc = node.loc
-        name = node.name.text
-        expr, t = cls.visit(node.expr, True, semantic)
-        assert isinstance(t, model.Type), (node, expr, t)
-
+    @classmethod
+    def do_get_attr(cls, loc, expr, t, name, semantic):
         if isinstance(t, model.PoisonType):
             return POISON_EXPR, POISON_TYPE
         elif isinstance(t, model.ModuleType):
@@ -595,16 +543,12 @@ class ResolveCode(object, metaclass=TypeDispatcher):
             semantic.status.error('cannot get attribute "%s" of %s' % (name, PrintableTypeName.visit(t)), loc)
             return POISON_EXPR, POISON_TYPE
 
-    @dispatch(parser.Call)
-    def visitCall(cls, node, used, semantic):
-        loc = node.loc
-        expr, et = cls.visit(node.expr, True, semantic)
-        arg_exprs, arg_types = cls.visit_expr_list(node.args, semantic)
-
+    @classmethod
+    def do_call(cls, loc, expr, et, arg_exprs, arg_types, semantic):
         if isinstance(et, model.PoisonType):
             return POISON_EXPR, POISON_TYPE
 
-        arg_count = len(node.args)
+        arg_count = len(arg_exprs)
 
         if isinstance(et, model.FunctionType):
             # TODO overloads?
@@ -649,6 +593,115 @@ class ResolveCode(object, metaclass=TypeDispatcher):
         else:
             semantic.status.error('cannot call %s' % (PrintableTypeName.visit(et)), loc)
             return POISON_EXPR, POISON_TYPE
+
+    @dispatch(parser.BooleanLiteral)
+    def visitBooleanLiteral(cls, node, used, semantic):
+        t = semantic.builtins['bool']
+        return model.BooleanLiteral(node.loc, node.value, t), t
+
+    @dispatch(parser.IntLiteral)
+    def visitIntLiteral(cls, node, used, semantic):
+        loc = node.loc
+        t = semantic.builtins[node.postfix]
+        value = int(node.text, node.base)
+
+        if t.name.startswith('f'):
+            return model.FloatLiteral(loc, value), t
+        else:
+            # Need to be a little conservative because we don't know if it's a negative literal or not.
+            bits = t.tag.width if t.tag.unsigned else t.tag.width - 1
+            if value > 2**bits:
+                semantic.status.error('literal of type %s is out of range' % PrintableTypeName.visit(t), loc)
+                return POISON_EXPR, t
+            return model.IntLiteral(loc, value, t), t
+
+    @dispatch(parser.FloatLiteral)
+    def visitFloatLiteral(cls, node, used, semantic):
+        loc = node.loc
+        t = semantic.builtins[node.postfix]
+        assert t.name.startswith('f'), t
+        # TODO error handling.
+        text = node.text
+        value = float(node.text)
+        # TODO flexible types?
+        return model.FloatLiteral(loc, text, value, t), t
+
+    @dispatch(parser.StringLiteral)
+    def visitStringLiteral(cls, node, used, semantic):
+        t = semantic.builtins['string']
+        return model.StringLiteral(node.loc, node.value, t), t
+
+    @dispatch(parser.StringConcat)
+    def visitStringConcat(cls, node, used, semantic):
+        t = semantic.builtins['string']
+        if len(node.children) == 0:
+            return model.StringLiteral(node.loc, "", t), t
+
+        arg_exprs, arg_types = cls.visit_expr_list(node.children, semantic)
+
+        coerced = []
+        poisoned = False
+        for arg_expr, arg_t in zip(arg_exprs, arg_types):
+            if isinstance(arg_t, model.PoisonType):
+                poisoned = True
+                continue
+            # Coerce to string?
+            if arg_t != t:
+                # Get to_string.
+                attr_expr, attr_t = cls.do_get_attr(arg_expr.loc, arg_expr, arg_t, 'to_string', semantic)
+                if isinstance(attr_t, model.PoisonType):
+                    poisoned = True
+                    continue
+                # Call the result.
+                coerce_expr, coerce_t = cls.do_call(attr_expr.loc, attr_expr, attr_t, [], [], semantic)
+                if isinstance(coerce_t, model.PoisonType):
+                    poisoned = True
+                    continue
+                # Is the interface right?
+                if coerce_t != t:
+                    semantic.status.error(f'.to_string() did not coerce {PrintableTypeName.visit(arg_t)} into a string', coerce_expr.loc)
+                    poisoned = True
+                    continue
+                arg_expr = coerce_expr
+                arg_t = coerce_t
+
+            coerced.append(arg_expr)
+
+        if poisoned:
+            return POISON_EXPR, POISON_TYPE
+
+        # Concatinate the strings.
+        expr = coerced.pop(0)
+        while coerced:
+            expr = model.BinaryOp(node.loc, expr, '+', coerced.pop(0), t)
+
+        return expr, t
+
+    @dispatch(parser.GetName)
+    def visitGetName(cls, node, used, semantic):
+        loc = node.name.loc
+        name = node.name.text
+        obj = semantic.lookup(name)
+        if obj is None:
+            semantic.status.error('cannot resolve "%s"' % name, loc)
+            return POISON_EXPR, POISON_TYPE
+        return wrap_obj(loc, obj)
+
+    @dispatch(parser.GetAttr)
+    def visitGetAttr(cls, node, used, semantic):
+        loc = node.loc
+        name = node.name.text
+        expr, t = cls.visit(node.expr, True, semantic)
+        assert isinstance(t, model.Type), (node, expr, t)
+
+        return cls.do_get_attr(loc, expr, t, name, semantic)
+
+    @dispatch(parser.Call)
+    def visitCall(cls, node, used, semantic):
+        loc = node.loc
+        expr, et = cls.visit(node.expr, True, semantic)
+        arg_exprs, arg_types = cls.visit_expr_list(node.args, semantic)
+        return cls.do_call(loc, expr, et, arg_exprs, arg_types, semantic)
 
 
     @dispatch(parser.TupleLiteral)

@@ -47,6 +47,11 @@ struct StringLiteral {
     value:string
 }
 
+struct StringConcat {
+    loc:location
+    children:[]Expr
+}
+
 struct Assign {
     loc:location
     target:Expr
@@ -106,7 +111,7 @@ struct BinaryOp {
     right:Expr
 }
 
-union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | Assign | Let | Sequence | If | While | Match | PrefixOp | BinaryOp;
+union Expr = GetName | Call | GetAttr | BooleanLiteral | TupleLiteral | FloatLiteral | IntLiteral | StringLiteral | StringConcat | Assign | Let | Sequence | If | While | Match | PrefixOp | BinaryOp;
 
 struct NamedTypeRef {
     name:Token
@@ -214,14 +219,31 @@ func string_value():string {
     /["]/;
     c = []rune{};
     (
-        c << /escape_char | [\\]["] | [^\\"]/
+        c << /escape_char | [\\]["] | [{][{] | [}][}] | [^\\"{}]/
     )*;
     /["]/;
     runes_to_string(c)
 }
 
-func string_literal():StringLiteral {
-    StringLiteral{loc(), string_value()}
+func string_fragment():string {
+    c = []rune{};
+    (
+        c << /escape_char | [\\]["] | [{][{] | [}][}] | [^\\"{}]/
+    )+;
+    runes_to_string(c)
+}
+
+func string_literal():Expr {
+    l = loc();
+    /["]/;
+    exprs = []Expr{};
+    (
+        exprs << StringLiteral{loc(), string_fragment()}
+    |
+        /[{] exprs << expr [}]/
+    )*;
+    /["]/;
+    StringConcat{l, exprs}
 }
 
 func matcher():Matcher {
@@ -247,7 +269,7 @@ func while_expr():While {
 }
 
 func expr_atom():Expr {
-    (/l=loc "(" S/; 
+    (/l=loc "(" S/;
         (e=expr();
             (args=[]Expr{e};
                 /(S "," S args<<expr)+/;

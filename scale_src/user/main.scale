@@ -17,7 +17,7 @@ fn main() {
     let i = 0;
     while i < 5 {
         (a, b) = swap(a-1, b+b);
-        std.print("(" + a.to_string() + ", " + b.to_string() + ")\n");
+        std.print("({a}, {b})\n");
         i = i + 1
     }
 }

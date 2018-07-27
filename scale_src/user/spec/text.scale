@@ -30,3 +30,18 @@ test "one compares" {
     std.assertEqualString("\x01abc", "\x01abc");
     std.assertNotEqualString("\x01abc", "\x01def");
 }
+
+test "simple interpolate" {
+    let a = 123;
+    let b = "!";
+    std.assertEqualString("{a}", "123");
+    std.assertEqualString("{a}{b}", "123!");
+    std.assertEqualString("<{a}...{b}>", "<123...!>");
+    std.assertEqualString("<{"foo"}>", "<foo>");
+
+}
+
+test "interpolate escape" {
+    std.assertEqualString("{{", "\x7b");
+    std.assertEqualString("}}", "\x7d")
+}
