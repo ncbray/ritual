@@ -1,0 +1,32 @@
+import std;
+
+test "empty string" {
+    std.assertEqualString("", "");
+    std.assertNotEqualString("", "\0")
+}
+
+test "simple string" {
+    std.assertEqualString("123", "123");
+    std.assertNotEqualString("123", "1234")
+}
+
+test "null equivilence" {
+    std.assertEqualString("\0", "\x00");
+    std.assertEqualString("\0", "\u{000000}")
+}
+
+test "null does not terminate" {
+    std.assertEqualString("\0abc", "\0abc");
+    std.assertNotEqualString("\0abc", "\0def");
+}
+
+test "one equivilence" {
+    std.assertEqualString("\x01", "\u{000001}")
+}
+
+// Note: if the code generator is broken and generates hex escapes,
+// \x01abc can tickle a corner case in C++ string literals.
+test "one compares" {
+    std.assertEqualString("\x01abc", "\x01abc");
+    std.assertNotEqualString("\x01abc", "\x01def");
+}

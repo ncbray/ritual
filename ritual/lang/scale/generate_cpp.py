@@ -152,6 +152,7 @@ escapes = {
     '\\': '\\\\',
     '"': '\\"',
     '\'': '\\\'',
+    '\0': '\\0',
     '\n': '\\n',
     '\r': '\\r',
     '\t': '\\t',
@@ -198,14 +199,13 @@ def is_printable_ascii(c):
     return 32 <= ord(c) < 127
 
 
+# Note: don't use hex escape sequences, they interact badly with subsequent hex characters.
 def escape_char(c):
     oc = ord(c)
     if c in escapes:
         return escapes[c]
     elif is_printable_ascii(c):
         return c
-    elif oc < 256:
-        return f'\\x{oc:02x}'
     elif oc < 65536:
         return f'\\u{oc:04x}'
     else:
@@ -213,7 +213,7 @@ def escape_char(c):
 
 
 def string_literal(s):
-    return f'u8"{"".join([escape_char(c) for c in s])}"'
+    return f'u8"{"".join([escape_char(c) for c in s])}"s'
 
 
 def implemented_as_ptr(t):
@@ -240,6 +240,8 @@ static inline {ret_type} op_{t}_{name}({c_type} a, {c_type} b) {{
 
 def gen_runtime(gen):
     gen_runtime_op('+', 'string', 'std::string', 'std::string', gen)
+    gen_runtime_op('==', 'string', 'std::string', 'bool', gen)
+    gen_runtime_op('!=', 'string', 'std::string', 'bool', gen)
 
     # Integers
     for width in [8, 16, 32, 64]:
@@ -686,6 +688,9 @@ class GenerateSource(object, metaclass=TypeDispatcher):
         includes.sort()
         for name in includes:
             gen.out.write(f'#include <{name}>\n')
+
+        # Use "s" suffix to preserve internal null characters.
+        gen.out.write('\nusing namespace std::string_literals;\n')
 
         gen_runtime(gen)
 

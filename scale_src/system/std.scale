@@ -19,3 +19,27 @@ fn assertEqualI32(a:i32, b:i32) {
         abort()
     }
 }
+
+fn assertEqualString(a:string, b:string) {
+    if (a != b) {
+        print("Assert failed.\n");
+        print("    ");
+        print(a);
+        print(" != ");
+        print(b);
+        print("\n");
+        abort()
+    }
+}
+
+fn assertNotEqualString(a:string, b:string) {
+    if (a == b) {
+        print("Assert failed.\n");
+        print("    ");
+        print(a);
+        print(" == ");
+        print(b);
+        print("\n");
+        abort()
+    }
+}
